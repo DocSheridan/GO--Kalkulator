@@ -33,6 +33,11 @@ automatisch die menügeführte Konsole.
 | **rechts** | Positionen des Angebots mit 1,0-/2,3-/3,5-fachem Satz, Faktor und Betrag |
 | **unten links** | Summen aller vier Spalten |
 | **unten rechts** | Gesamtpreis vorgeben und Faktoren automatisch verteilen |
+| **ganz unten** | Statuszeile mit der Rückmeldung zur letzten Aktion |
+
+Beide Tabellen haben einen waagerechten Rollbalken; auch auf einem schmalen
+Bildschirm bleiben Faktor und Betrag erreichbar. Das Fenster öffnet mit
+1380 × 840 Punkten und lässt sich bis 1040 × 700 verkleinern.
 
 * **Faktor ändern:** Doppelklick auf die Zelle *Faktor* (oder *Anzahl*).
 * **Position fixieren:** eine fixierte Ziffer behält ihren Faktor, wenn der

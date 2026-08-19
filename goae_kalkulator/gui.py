@@ -22,31 +22,32 @@ from .speicher import Angebotsverzeichnis, SpeicherFehler, dateiname
 from .zielbetrag import STRATEGIEN, optimiere_faktoren
 
 STRATEGIE_TEXT = {
-    "proportional": "Proportional - vorhandene Faktoren gleichmaessig anheben/senken",
-    "einheitlich": "Einheitlich - ein gemeinsamer Faktor fuer alle Ziffern",
-    "regelsatz": "Regelsatzbezogen - Vielfaches des jeweiligen Regelsatzes",
+    "proportional": "Proportional - vorhandene Faktoren skalieren",
+    "einheitlich": "Einheitlich - ein Faktor fuer alle Ziffern",
+    "regelsatz": "Regelsatzbezogen - Vielfaches des Regelsatzes",
 }
 TEXT_STRATEGIE = {v: k for k, v in STRATEGIE_TEXT.items()}
 
+# (Schluessel, Ueberschrift, Breite, Ausrichtung, mitwachsend)
 KATALOG_SPALTEN = (
-    ("nummer", "Ziffer", 62, "w"),
-    ("bezeichnung", "Leistung", 300, "w"),
-    ("punkte", "Punkte", 58, "e"),
-    ("e1", "1,0-fach", 72, "e"),
-    ("e23", "2,3-fach", 72, "e"),
-    ("e35", "3,5-fach", 72, "e"),
-    ("klasse", "Abschn./Klasse", 108, "w"),
+    ("nummer", "Ziffer", 56, "w", False),
+    ("bezeichnung", "Leistung", 220, "w", True),
+    ("punkte", "Punkte", 60, "e", False),
+    ("e1", "1,0-fach", 72, "e", False),
+    ("e23", "2,3-fach", 72, "e", False),
+    ("e35", "3,5-fach", 72, "e", False),
+    ("klasse", "Abschn./Klasse", 108, "w", False),
 )
 POSITION_SPALTEN = (
-    ("nummer", "Ziffer", 62, "w"),
-    ("bezeichnung", "Leistung", 290, "w"),
-    ("anzahl", "Anz.", 44, "e"),
-    ("e1", "1,0-fach", 74, "e"),
-    ("e23", "2,3-fach", 74, "e"),
-    ("e35", "3,5-fach", 74, "e"),
-    ("faktor", "Faktor", 62, "e"),
-    ("betrag", "Betrag", 86, "e"),
-    ("hinweis", "Begruendung / Hinweis", 220, "w"),
+    ("nummer", "Ziffer", 56, "w", False),
+    ("bezeichnung", "Leistung", 210, "w", True),
+    ("anzahl", "Anz.", 46, "e", False),
+    ("e1", "1,0-fach", 72, "e", False),
+    ("e23", "2,3-fach", 72, "e", False),
+    ("e35", "3,5-fach", 72, "e", False),
+    ("faktor", "Faktor", 68, "e", False),
+    ("betrag", "Betrag", 84, "e", False),
+    ("hinweis", "Begruendung / Hinweis", 170, "w", True),
 )
 
 
@@ -62,8 +63,8 @@ class Anwendung(tk.Tk):
         self._bearbeitung: tk.Entry | None = None
 
         self.title("GOAE-Abrechnungskalkulator")
-        self.geometry("1280x820")
-        self.minsize(1020, 660)
+        self.geometry("1380x840")
+        self.minsize(1040, 700)
         self.protocol("WM_DELETE_WINDOW", self.beenden)
 
         self.var_status = tk.StringVar(value=f"{len(self.katalog)} GOAE-Ziffern geladen.")
@@ -130,16 +131,21 @@ class Anwendung(tk.Tk):
         # -- Kopfbereich: Angebotsdaten
         kopf = ttk.LabelFrame(self, text="Angebot")
         kopf.pack(fill="x", padx=8, pady=(8, 4))
-        ttk.Label(kopf, text="Name").grid(row=0, column=0, sticky="w", padx=6, pady=6)
-        ttk.Entry(kopf, textvariable=self.var_name, width=34).grid(row=0, column=1, padx=4, pady=6)
-        ttk.Label(kopf, text="Patient/in").grid(row=0, column=2, sticky="w", padx=6)
-        ttk.Entry(kopf, textvariable=self.var_patient, width=24).grid(row=0, column=3, padx=4)
-        ttk.Label(kopf, text="Beschreibung").grid(row=0, column=4, sticky="w", padx=6)
-        ttk.Entry(kopf, textvariable=self.var_beschreibung, width=34).grid(
-            row=0, column=5, padx=4, sticky="ew")
-        kopf.columnconfigure(5, weight=1)
+        ttk.Label(kopf, text="Name").grid(row=0, column=0, sticky="w", padx=(6, 2), pady=6)
+        ttk.Entry(kopf, textvariable=self.var_name, width=26).grid(
+            row=0, column=1, sticky="ew", padx=(0, 12), pady=6)
+        ttk.Label(kopf, text="Patient/in").grid(row=0, column=2, sticky="w", padx=(0, 2))
+        ttk.Entry(kopf, textvariable=self.var_patient, width=18).grid(
+            row=0, column=3, sticky="ew", padx=(0, 12))
+        ttk.Label(kopf, text="Beschreibung").grid(row=0, column=4, sticky="w", padx=(0, 2))
+        ttk.Entry(kopf, textvariable=self.var_beschreibung, width=24).grid(
+            row=0, column=5, sticky="ew", padx=(0, 12))
+        # Die Eingabefelder teilen sich den freien Platz, die Knoepfe bleiben rechts.
+        kopf.columnconfigure(1, weight=3)
+        kopf.columnconfigure(3, weight=2)
+        kopf.columnconfigure(5, weight=4)
         knoepfe = ttk.Frame(kopf)
-        knoepfe.grid(row=0, column=6, padx=6)
+        knoepfe.grid(row=1, column=0, columnspan=6, sticky="e", padx=6, pady=(0, 6))
         ttk.Button(knoepfe, text="Neu", command=self.neu).pack(side="left", padx=2)
         ttk.Button(knoepfe, text="Oeffnen", command=self.oeffnen).pack(side="left", padx=2)
         ttk.Button(knoepfe, text="Speichern", command=self.speichern).pack(side="left", padx=2)
@@ -152,11 +158,37 @@ class Anwendung(tk.Tk):
         mitte.pack(fill="both", expand=True, padx=8, pady=4)
         mitte.add(self._katalog_bereich(mitte), weight=2)
         mitte.add(self._positions_bereich(mitte), weight=3)
+        # Anfangsteilung setzen, sobald die Fenstergroesse feststeht.
+        self.after(80, lambda: self._teile(mitte))
 
-        # -- Fuss: Summen und Zielbetrag
+        # -- Fuss: Statuszeile ganz unten, darueber Summen und Zielbetrag.
+        # Bei side="bottom" landet das zuerst gepackte Element ganz unten.
+        ttk.Label(self, textvariable=self.var_status, relief="sunken", anchor="w",
+                  padding=(6, 2)).pack(fill="x", side="bottom")
         self._summen_bereich()
-        ttk.Label(self, textvariable=self.var_status, relief="sunken", anchor="w").pack(
-            fill="x", side="bottom")
+
+    @staticmethod
+    def _tabelle(eltern, spalten, **einstellungen) -> tuple[ttk.Frame, "ttk.Treeview"]:
+        """Treeview mit senkrechtem und waagerechtem Rollbalken.
+
+        Ohne den waagerechten Rollbalken sind die rechten Spalten (Faktor,
+        Betrag) in einem schmalen Fenster weder sichtbar noch erreichbar.
+        """
+        rahmen = ttk.Frame(eltern)
+        baum = ttk.Treeview(rahmen, columns=[s[0] for s in spalten], show="headings",
+                            **einstellungen)
+        senkrecht = ttk.Scrollbar(rahmen, orient="vertical", command=baum.yview)
+        waagerecht = ttk.Scrollbar(rahmen, orient="horizontal", command=baum.xview)
+        baum.configure(yscrollcommand=senkrecht.set, xscrollcommand=waagerecht.set)
+        baum.grid(row=0, column=0, sticky="nsew")
+        senkrecht.grid(row=0, column=1, sticky="ns")
+        waagerecht.grid(row=1, column=0, sticky="ew")
+        rahmen.rowconfigure(0, weight=1)
+        rahmen.columnconfigure(0, weight=1)
+        for schluessel, titel, breite, anker, waechst in spalten:
+            baum.heading(schluessel, text=titel, anchor=anker)
+            baum.column(schluessel, width=breite, minwidth=40, anchor=anker, stretch=waechst)
+        return rahmen, baum
 
     def _katalog_bereich(self, eltern) -> ttk.Frame:
         rahmen = ttk.LabelFrame(eltern, text="GOAE-Katalog")
@@ -169,21 +201,14 @@ class Anwendung(tk.Tk):
         ttk.Button(suchzeile, text="Zuruecksetzen",
                    command=lambda: (self.var_suche.set(""), self._fuelle_katalog())).pack(side="left")
 
-        self.baum_katalog = ttk.Treeview(
-            rahmen, columns=[s[0] for s in KATALOG_SPALTEN], show="headings", selectmode="extended")
-        for schluessel, titel, breite, anker in KATALOG_SPALTEN:
-            self.baum_katalog.heading(schluessel, text=titel)
-            self.baum_katalog.column(schluessel, width=breite, anchor=anker,
-                                     stretch=(schluessel == "bezeichnung"))
-        rolle = ttk.Scrollbar(rahmen, orient="vertical", command=self.baum_katalog.yview)
-        self.baum_katalog.configure(yscrollcommand=rolle.set)
-        self.baum_katalog.pack(side="left", fill="both", expand=True, padx=(6, 0), pady=(0, 6))
-        rolle.pack(side="left", fill="y", pady=(0, 6))
-        self.baum_katalog.bind("<Double-1>", lambda _e: self.uebernehmen())
-        self.baum_katalog.bind("<Return>", lambda _e: self.uebernehmen())
-
         fuss = ttk.Frame(rahmen)
         fuss.pack(side="bottom", fill="x", padx=6, pady=6)
+
+        tabelle, self.baum_katalog = self._tabelle(rahmen, KATALOG_SPALTEN,
+                                                  selectmode="extended")
+        tabelle.pack(side="top", fill="both", expand=True, padx=6, pady=(0, 4))
+        self.baum_katalog.bind("<Double-1>", lambda _e: self.uebernehmen())
+        self.baum_katalog.bind("<Return>", lambda _e: self.uebernehmen())
         ttk.Label(fuss, text="Anzahl").pack(side="left")
         ttk.Spinbox(fuss, from_=1, to=99, width=4, textvariable=self.var_anzahl).pack(
             side="left", padx=(4, 10))
@@ -196,38 +221,36 @@ class Anwendung(tk.Tk):
 
     def _positions_bereich(self, eltern) -> ttk.Frame:
         rahmen = ttk.LabelFrame(eltern, text="Positionen des Angebots")
-        self.baum_positionen = ttk.Treeview(
-            rahmen, columns=[s[0] for s in POSITION_SPALTEN], show="headings", selectmode="browse")
-        for schluessel, titel, breite, anker in POSITION_SPALTEN:
-            self.baum_positionen.heading(schluessel, text=titel)
-            self.baum_positionen.column(schluessel, width=breite, anchor=anker,
-                                        stretch=(schluessel in ("bezeichnung", "hinweis")))
+        # Werkzeugleiste zuerst anlegen, damit sie bei wenig Platz erhalten
+        # bleibt und stattdessen die Tabelle schrumpft.
+        werkzeuge = ttk.Frame(rahmen)
+        werkzeuge.pack(side="bottom", fill="x", padx=6, pady=(0, 6))
+        zeile1 = ttk.Frame(werkzeuge)
+        zeile1.pack(fill="x")
+        ttk.Button(zeile1, text="Entfernen", command=self.entfernen).pack(side="left", padx=2)
+        ttk.Button(zeile1, text="Faktor...", command=self.faktor_setzen).pack(side="left", padx=2)
+        ttk.Button(zeile1, text="Anzahl...", command=self.anzahl_setzen).pack(side="left", padx=2)
+        ttk.Button(zeile1, text="Begruendung...", command=self.begruendung_setzen).pack(
+            side="left", padx=2)
+        ttk.Button(zeile1, text="Fixieren / Freigeben", command=self.fixieren).pack(
+            side="left", padx=2)
+        zeile2 = ttk.Frame(werkzeuge)
+        zeile2.pack(fill="x", pady=(4, 0))
+        ttk.Label(zeile2, text="Alle Faktoren auf").pack(side="left", padx=(2, 4))
+        for wert in ("1,0", "2,3", "3,5"):
+            ttk.Button(zeile2, text=wert, width=5,
+                       command=lambda w=wert: self.alle_faktoren(w)).pack(side="left", padx=1)
+        ttk.Label(zeile2, text="Doppelklick auf Faktor oder Anzahl bearbeitet die Zelle").pack(
+            side="right", padx=2)
+
+        tabelle, self.baum_positionen = self._tabelle(rahmen, POSITION_SPALTEN,
+                                                     selectmode="browse")
+        tabelle.pack(side="top", fill="both", expand=True, padx=6, pady=(6, 4))
         self.baum_positionen.tag_configure("warnung", foreground="#b45309")
         self.baum_positionen.tag_configure("fehler", foreground="#b91c1c")
         self.baum_positionen.tag_configure("fixiert", background="#eef2f7")
-        rolle = ttk.Scrollbar(rahmen, orient="vertical", command=self.baum_positionen.yview)
-        self.baum_positionen.configure(yscrollcommand=rolle.set)
-        self.baum_positionen.pack(side="top", fill="both", expand=True, padx=(6, 0), pady=(6, 0))
-        rolle.place(relx=1.0, rely=0.0, anchor="ne")
         self.baum_positionen.bind("<Double-1>", self._zelle_bearbeiten)
         self.baum_positionen.bind("<Delete>", lambda _e: self.entfernen())
-
-        werkzeuge = ttk.Frame(rahmen)
-        werkzeuge.pack(fill="x", padx=6, pady=6)
-        ttk.Button(werkzeuge, text="Entfernen", command=self.entfernen).pack(side="left", padx=2)
-        ttk.Button(werkzeuge, text="Faktor...", command=self.faktor_setzen).pack(side="left", padx=2)
-        ttk.Button(werkzeuge, text="Anzahl...", command=self.anzahl_setzen).pack(side="left", padx=2)
-        ttk.Button(werkzeuge, text="Begruendung...", command=self.begruendung_setzen).pack(
-            side="left", padx=2)
-        ttk.Button(werkzeuge, text="Fixieren / Freigeben", command=self.fixieren).pack(
-            side="left", padx=2)
-        ttk.Separator(werkzeuge, orient="vertical").pack(side="left", fill="y", padx=8)
-        ttk.Label(werkzeuge, text="Alle auf").pack(side="left")
-        for wert in ("1,0", "2,3", "3,5"):
-            ttk.Button(werkzeuge, text=wert, width=4,
-                       command=lambda w=wert: self.alle_faktoren(w)).pack(side="left", padx=1)
-        ttk.Label(werkzeuge, text="(Doppelklick auf Faktor oder Anzahl bearbeitet die Zelle)").pack(
-            side="right")
         return rahmen
 
     def _summen_bereich(self) -> None:
@@ -235,7 +258,7 @@ class Anwendung(tk.Tk):
         rahmen.pack(fill="x", padx=8, pady=(0, 8), side="bottom")
 
         summen = ttk.LabelFrame(rahmen, text="Summen")
-        summen.pack(side="left", fill="both", expand=True, padx=(0, 6))
+        summen.pack(side="left", fill="y", expand=False, padx=(0, 6))
         for spalte, (schluessel, titel) in enumerate(
             (("e1", "einfacher Satz"), ("e23", "2,3-facher Satz"),
              ("e35", "3,5-facher Satz"), ("ist", "kalkuliert"))
@@ -243,36 +266,49 @@ class Anwendung(tk.Tk):
             ttk.Label(summen, text=titel).grid(row=0, column=spalte, padx=14, pady=(6, 0))
             ttk.Label(summen, textvariable=self.summen[schluessel],
                       style="Gross.TLabel" if schluessel == "ist" else "Summe.TLabel").grid(
-                row=1, column=spalte, padx=14, pady=(0, 8))
-            summen.columnconfigure(spalte, weight=1)
+                row=1, column=spalte, padx=12, pady=(0, 8))
 
         ziel = ttk.LabelFrame(rahmen, text="Gesamtpreis vorgeben - Faktoren automatisch verteilen")
         ziel.pack(side="left", fill="both", expand=True)
+
         ttk.Label(ziel, text="Zielbetrag EUR").grid(row=0, column=0, sticky="w", padx=6, pady=(6, 2))
         eingabe = ttk.Entry(ziel, textvariable=self.var_ziel, width=12)
-        eingabe.grid(row=0, column=1, padx=4, pady=(6, 2))
+        eingabe.grid(row=0, column=1, sticky="w", padx=4, pady=(6, 2))
         eingabe.bind("<Return>", lambda _e: self.verteile())
-        ttk.Combobox(ziel, textvariable=self.var_strategie, state="readonly", width=52,
-                     values=[STRATEGIE_TEXT[s] for s in STRATEGIEN]).grid(
-            row=0, column=2, padx=6, pady=(6, 2), sticky="ew")
         ttk.Button(ziel, text="Faktoren verteilen", command=self.verteile).grid(
-            row=0, column=3, padx=6, pady=(6, 2))
+            row=0, column=2, sticky="e", padx=6, pady=(6, 2))
+
+        # Eigene Zeile: sonst wird die Auswahlliste in schmalen Fenstern
+        # bis zur Unlesbarkeit zusammengedrueckt.
+        ttk.Label(ziel, text="Verteilung").grid(row=1, column=0, sticky="w", padx=6)
+        ttk.Combobox(ziel, textvariable=self.var_strategie, state="readonly",
+                     values=[STRATEGIE_TEXT[s] for s in STRATEGIEN]).grid(
+            row=1, column=1, columnspan=2, sticky="ew", padx=4, pady=2)
 
         stufung = ttk.Frame(ziel)
-        stufung.grid(row=1, column=0, columnspan=4, sticky="w", padx=6)
+        stufung.grid(row=2, column=0, columnspan=3, sticky="w", padx=6)
         ttk.Label(stufung, text="Faktorstufung").pack(side="left")
         ttk.Combobox(stufung, textvariable=self.var_raster, state="readonly", width=6,
                      values=("0,1", "0,05", "0,01")).pack(side="left", padx=(4, 12))
         ttk.Checkbutton(
             stufung, variable=self.var_centgenau,
-            text="Betrag centgenau treffen (feinere Faktoren zulassen)").pack(side="left")
+            text="Betrag centgenau treffen").pack(side="left")
         ttk.Checkbutton(
             ziel, variable=self.var_rechtlich,
             text="Hoechstsaetze der Steigerungsklassen beachten (Labor 1,3 / technisch 2,5)",
-        ).grid(row=2, column=0, columnspan=4, sticky="w", padx=6)
-        ttk.Label(ziel, textvariable=self.var_spanne).grid(
-            row=3, column=0, columnspan=4, sticky="w", padx=6, pady=(2, 6))
+        ).grid(row=3, column=0, columnspan=3, sticky="w", padx=6)
+        ttk.Label(ziel, textvariable=self.var_spanne, wraplength=520, justify="left").grid(
+            row=4, column=0, columnspan=3, sticky="w", padx=6, pady=(2, 6))
         ziel.columnconfigure(2, weight=1)
+
+    def _teile(self, geteilt) -> None:
+        """Trennlinie so setzen, dass die Positionstabelle vollstaendig sichtbar ist."""
+        try:
+            breite = geteilt.winfo_width()
+            if breite > 400:
+                geteilt.sashpos(0, max(340, breite - 800))
+        except tk.TclError:
+            pass
 
     # -- Darstellung ------------------------------------------------------
     def _fuelle_katalog(self) -> None:
@@ -320,7 +356,7 @@ class Anwendung(tk.Tk):
                     f"(Faktoren {MIN_FAKTOR} bis {MAX_FAKTOR})")
             if self.angebot.zielbetrag is not None:
                 abweichung = self.angebot.summe - self.angebot.zielbetrag
-                text += (f"   |   Ziel {geld(self.angebot.zielbetrag)} EUR, "
+                text += (f"\nZiel {geld(self.angebot.zielbetrag)} EUR, "
                          f"Abweichung {geld(abweichung)} EUR")
             self.var_spanne.set(text)
         else:
@@ -468,11 +504,13 @@ class Anwendung(tk.Tk):
 
     def _zelle_bearbeiten(self, ereignis) -> None:
         """Doppelklick auf Faktor oder Anzahl: Wert direkt in der Zelle aendern."""
-        if self.baum_positionen.identify_region(ereignis.x, ereignis.y) != "cell":
+        # identify_region meldet ausserhalb des sichtbaren Bereichs "nothing";
+        # massgeblich sind Zeile und Spalte unter dem Mauszeiger.
+        if self.baum_positionen.identify_region(ereignis.x, ereignis.y) == "heading":
             return
         zeile = self.baum_positionen.identify_row(ereignis.y)
         spalte = self.baum_positionen.identify_column(ereignis.x)
-        if not zeile:
+        if not zeile or not spalte:
             return
         namen = [s[0] for s in POSITION_SPALTEN]
         index = int(spalte[1:]) - 1
