@@ -1,0 +1,495 @@
+"""Testfaelle des GOAE-Abrechnungskalkulators."""
+
+import contextlib
+import io
+import sys
+import tempfile
+import unittest
+import zipfile
+from decimal import Decimal
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from goae_kalkulator.cli import betrag, main, zerlege_ziffer, Abbruch
+from goae_kalkulator.excel import exportiere
+from goae_kalkulator.katalog import Katalog, KatalogFehler
+from goae_kalkulator.modelle import (
+    FAKTOR_SCHRITT, MAX_FAKTOR, MIN_FAKTOR, Angebot, Leistung, Position, faktor_text, geld,
+)
+from goae_kalkulator.speicher import Angebotsverzeichnis, SpeicherFehler, dateiname
+from goae_kalkulator.zielbetrag import optimiere_faktoren, STRATEGIEN
+
+
+def leistung(nummer="1", punkte=80, klasse="aerztlich", regel="2.3", hoechst="3.5"):
+    return Leistung(nummer, f"Testleistung {nummer}", punkte, "B", klasse,
+                    Decimal(regel), Decimal(hoechst))
+
+
+class TestBetragsrechnung(unittest.TestCase):
+    """Punktzahl x Punktwert x Faktor, kaufmaennisch auf den Cent gerundet."""
+
+    def test_bekannte_betraege(self):
+        # Allgemein gelaeufige GOAE-Betraege fuer Nr. 1, 3 und 8.
+        for punkte, einfach, zweikommadrei, dreikommafuenf in [
+            (80, "4.66", "10.72", "16.32"),
+            (150, "8.74", "20.11", "30.60"),
+            (260, "15.15", "34.86", "53.04"),
+        ]:
+            l = leistung(punkte=punkte)
+            self.assertEqual(l.einfachsatz, Decimal(einfach))
+            self.assertEqual(l.satz_2_3, Decimal(zweikommadrei))
+            self.assertEqual(l.satz_3_5, Decimal(dreikommafuenf))
+
+    def test_anzahl_vervielfacht_den_gerundeten_einzelbetrag(self):
+        p = Position.aus_leistung(leistung(punkte=80), anzahl=3, faktorwert=Decimal("2.3"))
+        self.assertEqual(p.einzelbetrag, Decimal("10.72"))
+        self.assertEqual(p.betrag, Decimal("32.16"))
+
+    def test_faktor_wird_auf_drei_stellen_normiert(self):
+        p = Position.aus_leistung(leistung(), faktorwert=Decimal("2.3456"))
+        self.assertEqual(p.faktor, Decimal("2.346"))
+
+    def test_darstellung(self):
+        self.assertEqual(geld(Decimal("1234.5")), "1.234,50")
+        self.assertEqual(faktor_text(Decimal("2.300")), "2,3")
+        self.assertEqual(faktor_text(Decimal("3.359")), "3,359")
+        self.assertEqual(faktor_text(Decimal("1.000")), "1,0")
+
+
+class TestHinweise(unittest.TestCase):
+    def test_ueber_regelsatz_verlangt_begruendung(self):
+        p = Position.aus_leistung(leistung(), faktorwert=Decimal("2.8"))
+        self.assertTrue(p.ueber_regelsatz)
+        self.assertIn("Begruendung", p.hinweis())
+        p.begruendung = "erhoehter Zeitaufwand"
+        self.assertEqual(p.hinweis(), "")
+
+    def test_ueber_hoechstsatz_der_klasse(self):
+        p = Position.aus_leistung(leistung(klasse="labor", regel="1.15", hoechst="1.3"),
+                                  faktorwert=Decimal("2.0"))
+        self.assertTrue(p.ueber_hoechstsatz)
+        self.assertIn("Hoechstsatz", p.hinweis())
+
+
+class TestAngebot(unittest.TestCase):
+    def setUp(self):
+        self.angebot = Angebot(name="Paket")
+        self.angebot.hinzufuegen(Position.aus_leistung(leistung("1", 80)))
+        self.angebot.hinzufuegen(Position.aus_leistung(leistung("8", 260), anzahl=2))
+
+    def test_summen_der_anzeigespalten(self):
+        self.assertEqual(self.angebot.summe_einfach, Decimal("4.66") + Decimal("30.30"))
+        self.assertEqual(self.angebot.summe_2_3, Decimal("10.72") + Decimal("69.72"))
+        self.assertEqual(self.angebot.summe_3_5, Decimal("16.32") + Decimal("106.08"))
+        self.assertEqual(self.angebot.summe, self.angebot.summe_2_3)
+
+    def test_punkte(self):
+        self.assertEqual(self.angebot.punkte, 80 + 520)
+
+    def test_spanne_beruecksichtigt_fixierte_positionen(self):
+        self.angebot.positionen[0].fixiert = True
+        self.angebot.positionen[0].faktor = Decimal("3.0")
+        unten, oben = self.angebot.spanne()
+        fest = self.angebot.positionen[0].betrag
+        self.assertEqual(unten, fest + Decimal("30.30"))
+        self.assertEqual(oben, fest + Decimal("106.08"))
+
+    def test_serialisierung_ist_verlustfrei(self):
+        self.angebot.zielbetrag = Decimal("99.90")
+        self.angebot.positionen[0].begruendung = "Test"
+        kopie = Angebot.from_dict(self.angebot.to_dict())
+        self.assertEqual(kopie.summe, self.angebot.summe)
+        self.assertEqual(kopie.zielbetrag, Decimal("99.90"))
+        self.assertEqual(kopie.positionen[0].begruendung, "Test")
+
+
+class TestKatalog(unittest.TestCase):
+    def setUp(self):
+        self.katalog = Katalog.laden()
+
+    def test_mitgelieferter_katalog_laedt(self):
+        self.assertGreater(len(self.katalog), 20)
+        self.assertIn("1", self.katalog)
+        self.assertEqual(self.katalog.hole("1").punktzahl, 80)
+
+    def test_suche_nach_nummer_und_text(self):
+        self.assertTrue(any(l.nummer == "1" for l in self.katalog.suche("1")))
+        self.assertTrue(self.katalog.suche("beratung"))
+        self.assertEqual(self.katalog.suche("gibtesnicht"), [])
+
+    def test_exakter_nummerntreffer_steht_vorn(self):
+        self.assertEqual(self.katalog.suche("50")[0].nummer, "50")
+
+    def test_unbekannte_ziffer(self):
+        with self.assertRaises(KeyError):
+            self.katalog.hole("99999")
+
+    def test_import_mit_komma_und_tabulator(self):
+        text = "nummer\tbezeichnung\tpunktzahl\tklasse\tregelsatz\n" \
+               "9001\tEigene Leistung\t250\taerztlich\t2,3\n"
+        eigen = Katalog.aus_text(text)
+        self.assertEqual(eigen.hole("9001").punktzahl, 250)
+        self.assertEqual(eigen.hole("9001").regelsatz, Decimal("2.3"))
+
+    def test_kommentarzeilen_werden_uebersprungen(self):
+        text = "# Kommentar\n\nnummer;bezeichnung;punktzahl\n7000;Test;100\n"
+        self.assertEqual(len(Katalog.aus_text(text)), 1)
+
+    def test_fehlerhafte_datei(self):
+        with self.assertRaises(KatalogFehler):
+            Katalog.aus_text("bezeichnung;punkte\nTest;100\n")
+        with self.assertRaises(KatalogFehler):
+            Katalog.aus_text("nummer;punktzahl\n1;keinezahl\n")
+
+    def test_ergaenzen_ersetzt_gleiche_nummer(self):
+        vorher = len(self.katalog)
+        self.katalog.ergaenzen(Katalog.aus_text("nummer;bezeichnung;punktzahl\n1;Neu;999\n"))
+        self.assertEqual(len(self.katalog), vorher)
+        self.assertEqual(self.katalog.hole("1").punktzahl, 999)
+
+
+class TestZielbetrag(unittest.TestCase):
+    def bau(self):
+        angebot = Angebot(name="Ziel")
+        for nummer, punkte in (("1", 80), ("8", 260), ("650", 253), ("410", 200)):
+            angebot.hinzufuegen(Position.aus_leistung(leistung(nummer, punkte)))
+        return angebot
+
+    def test_zielbetrag_wird_centgenau_getroffen(self):
+        """Mit erlaubter Nachjustierung stimmt der Betrag exakt."""
+        # Erreichbar sind mit diesen vier Ziffern rund 46,22 bis 161,77 EUR.
+        for ziel in ("60.00", "99.99", "123.45", "150.00", "161.00"):
+            angebot = self.bau()
+            ergebnis = optimiere_faktoren(angebot.positionen, ziel, nachjustieren=True)
+            self.assertEqual(angebot.summe, ergebnis.summe)
+            self.assertTrue(ergebnis.erreicht, f"{ziel}: {ergebnis.meldung}")
+            self.assertEqual(ergebnis.summe, Decimal(ziel))
+
+    def test_zehntelraster_kommt_dem_zielbetrag_sehr_nahe(self):
+        """Vorgabe sind Zehntelschritte; ein Restbetrag von wenigen Cent bleibt moeglich."""
+        for ziel in ("60.00", "99.99", "123.45", "150.00", "161.00"):
+            angebot = self.bau()
+            ergebnis = optimiere_faktoren(angebot.positionen, ziel)
+            self.assertLessEqual(abs(ergebnis.abweichung), Decimal("0.20"),
+                                 f"{ziel}: {ergebnis.meldung}")
+            for p in angebot.positionen:
+                self.assertEqual(p.faktor, p.faktor.quantize(Decimal("0.1")),
+                                 f"Ziffer {p.nummer}: {p.faktor} liegt nicht im Zehntelraster")
+
+    def test_feineres_raster_ist_waehlbar(self):
+        angebot = self.bau()
+        optimiere_faktoren(angebot.positionen, "123.45", schrittweite=Decimal("0.01"))
+        for p in angebot.positionen:
+            self.assertEqual(p.faktor, p.faktor.quantize(Decimal("0.01")))
+
+    def test_faktoren_bleiben_in_der_spanne(self):
+        for ziel in ("50.00", "100.00", "161.00", "1000.00", "10.00"):
+            angebot = self.bau()
+            optimiere_faktoren(angebot.positionen, ziel)
+            for p in angebot.positionen:
+                self.assertGreaterEqual(p.faktor, MIN_FAKTOR, f"{ziel} / Ziffer {p.nummer}")
+                self.assertLessEqual(p.faktor, MAX_FAKTOR, f"{ziel} / Ziffer {p.nummer}")
+
+    def test_alle_strategien_treffen_den_zielbetrag(self):
+        for strategie in STRATEGIEN:
+            angebot = self.bau()
+            ergebnis = optimiere_faktoren(angebot.positionen, "120.00", strategie=strategie,
+                                          nachjustieren=True)
+            self.assertTrue(ergebnis.erreicht, f"{strategie}: {ergebnis.meldung}")
+
+    def test_einheitliche_strategie_liefert_einen_faktor(self):
+        angebot = self.bau()
+        optimiere_faktoren(angebot.positionen, "120.00", strategie="einheitlich")
+        faktoren = {p.faktor for p in angebot.positionen}
+        # Der Feinabgleich darf einzelne Ziffern um einen Rasterschritt nachziehen.
+        self.assertLessEqual(max(faktoren) - min(faktoren), Decimal("0.2"))
+
+    def test_zu_hoher_zielbetrag_endet_am_oberen_anschlag(self):
+        angebot = self.bau()
+        ergebnis = optimiere_faktoren(angebot.positionen, "5000.00")
+        self.assertFalse(ergebnis.erreicht)
+        self.assertEqual(ergebnis.summe, ergebnis.max_summe)
+        self.assertTrue(all(p.faktor == MAX_FAKTOR for p in angebot.positionen))
+        self.assertIn("zu hoch", ergebnis.meldung)
+
+    def test_zu_niedriger_zielbetrag_endet_am_unteren_anschlag(self):
+        angebot = self.bau()
+        ergebnis = optimiere_faktoren(angebot.positionen, "1.00")
+        self.assertFalse(ergebnis.erreicht)
+        self.assertEqual(ergebnis.summe, ergebnis.min_summe)
+        self.assertTrue(all(p.faktor == MIN_FAKTOR for p in angebot.positionen))
+        self.assertIn("zu niedrig", ergebnis.meldung)
+
+    def test_fixierte_positionen_bleiben_unveraendert(self):
+        angebot = self.bau()
+        angebot.positionen[0].faktor = Decimal("1.7")
+        angebot.positionen[0].fixiert = True
+        ergebnis = optimiere_faktoren(angebot.positionen, "120.00", nachjustieren=True)
+        self.assertEqual(angebot.positionen[0].faktor, Decimal("1.700"))
+        self.assertTrue(ergebnis.erreicht, ergebnis.meldung)
+        self.assertEqual(angebot.summe, Decimal("120.00"))
+
+    def test_nur_fixierte_positionen(self):
+        angebot = self.bau()
+        for p in angebot.positionen:
+            p.fixiert = True
+        ergebnis = optimiere_faktoren(angebot.positionen, "120.00")
+        self.assertIn("fixiert", ergebnis.meldung)
+
+    def test_leeres_angebot(self):
+        ergebnis = optimiere_faktoren([], "100.00")
+        self.assertIn("keine Positionen", ergebnis.meldung)
+
+    def test_engere_grenzen_werden_beachtet(self):
+        angebot = self.bau()
+        optimiere_faktoren(angebot.positionen, "100.00",
+                           min_faktor=Decimal("1.5"), max_faktor=Decimal("2.5"))
+        for p in angebot.positionen:
+            self.assertGreaterEqual(p.faktor, Decimal("1.5"))
+            self.assertLessEqual(p.faktor, Decimal("2.5"))
+
+    def test_rechtliche_grenzen_der_steigerungsklassen(self):
+        angebot = Angebot(name="Klassen")
+        angebot.hinzufuegen(Position.aus_leistung(leistung("1", 80)))
+        angebot.hinzufuegen(Position.aus_leistung(
+            leistung("3511", 30, klasse="labor", regel="1.15", hoechst="1.3")))
+        angebot.hinzufuegen(Position.aus_leistung(
+            leistung("650", 253, klasse="technisch", regel="1.8", hoechst="2.5")))
+        optimiere_faktoren(angebot.positionen, "45.00", rechtliche_grenzen=True)
+        nach_nummer = {p.nummer: p for p in angebot.positionen}
+        self.assertLessEqual(nach_nummer["3511"].faktor, Decimal("1.3"))
+        self.assertLessEqual(nach_nummer["650"].faktor, Decimal("2.5"))
+
+    def test_nachjustierung_schliesst_die_luecke(self):
+        angebot = Angebot(name="Fein")
+        angebot.hinzufuegen(Position.aus_leistung(leistung("1", 80)))
+        grob = optimiere_faktoren(angebot.positionen, "9.37", anwenden=False)
+        fein = optimiere_faktoren(angebot.positionen, "9.37", nachjustieren=True, anwenden=False)
+        self.assertNotEqual(grob.abweichung, Decimal("0.00"))
+        self.assertIn("Faktorraster", grob.meldung)
+        self.assertTrue(fein.erreicht, fein.meldung)
+
+    def test_meldung_verweist_auf_feinere_stufung(self):
+        angebot = Angebot(name="Fein")
+        angebot.hinzufuegen(Position.aus_leistung(leistung("1", 80)))
+        ergebnis = optimiere_faktoren(angebot.positionen, "9.37", anwenden=False)
+        self.assertFalse(ergebnis.erreicht)
+        self.assertIn("feineren Faktoren", ergebnis.meldung)
+
+    def test_nicht_darstellbarer_betrag_wird_als_solcher_gemeldet(self):
+        """Bei Anzahl 3 wird der Einzelbetrag gerundet und verdreifacht -
+        erreichbar sind dann nur Vielfache von drei Cent."""
+        angebot = Angebot(name="Dreifach")
+        angebot.hinzufuegen(Position.aus_leistung(leistung("3541", 40), anzahl=3))
+        ergebnis = optimiere_faktoren(angebot.positionen, "13.00", nachjustieren=True)
+        self.assertFalse(ergebnis.erreicht)
+        self.assertEqual(abs(ergebnis.abweichung), Decimal("0.01"))
+        self.assertIn("Feiner geht es nicht", ergebnis.meldung)
+
+    def test_vorgabe_ist_das_zehntelraster(self):
+        self.assertEqual(FAKTOR_SCHRITT, Decimal("0.1"))
+
+    def test_probelauf_veraendert_nichts(self):
+        angebot = self.bau()
+        vorher = [p.faktor for p in angebot.positionen]
+        optimiere_faktoren(angebot.positionen, "180.00", anwenden=False)
+        self.assertEqual([p.faktor for p in angebot.positionen], vorher)
+
+    def test_unbekannte_strategie(self):
+        with self.assertRaises(ValueError):
+            optimiere_faktoren([], "10.00", strategie="wuenschdirwas")
+
+
+class TestSpeicher(unittest.TestCase):
+    def setUp(self):
+        self.ordner = tempfile.TemporaryDirectory()
+        self.verzeichnis = Angebotsverzeichnis(self.ordner.name)
+
+    def tearDown(self):
+        self.ordner.cleanup()
+
+    def bau(self, name="Mein Angebot"):
+        angebot = Angebot(name=name, patient="Frau Muster")
+        angebot.hinzufuegen(Position.aus_leistung(leistung("1", 80)))
+        return angebot
+
+    def test_speichern_und_laden(self):
+        angebot = self.bau()
+        pfad = self.verzeichnis.speichern(angebot)
+        self.assertTrue(pfad.exists())
+        geladen = self.verzeichnis.laden("Mein Angebot")
+        self.assertEqual(geladen.patient, "Frau Muster")
+        self.assertEqual(geladen.summe, angebot.summe)
+
+    def test_erneutes_speichern_legt_keine_zweite_datei_an(self):
+        angebot = self.bau()
+        self.verzeichnis.speichern(angebot)
+        angebot.hinzufuegen(Position.aus_leistung(leistung("8", 260)))
+        self.verzeichnis.speichern(angebot)
+        self.assertEqual(len(self.verzeichnis.dateien()), 1)
+        self.assertEqual(len(self.verzeichnis.laden("Mein Angebot").positionen), 2)
+
+    def test_umlaute_und_sonderzeichen_im_namen(self):
+        angebot = self.bau("Vorsorge für Männer / 2026")
+        self.verzeichnis.speichern(angebot)
+        geladen = self.verzeichnis.laden("Vorsorge für Männer / 2026")
+        self.assertEqual(geladen.name, "Vorsorge für Männer / 2026")
+        self.assertEqual(dateiname("Vorsorge für Männer / 2026"), "Vorsorge_fuer_Maenner_2026")
+
+    def test_liste_und_loeschen(self):
+        self.verzeichnis.speichern(self.bau("A"))
+        self.verzeichnis.speichern(self.bau("B"))
+        self.assertEqual(sorted(self.verzeichnis.namen()), ["A", "B"])
+        self.verzeichnis.loeschen("A")
+        self.assertEqual(self.verzeichnis.namen(), ["B"])
+
+    def test_kopieren(self):
+        self.verzeichnis.speichern(self.bau("Original"))
+        self.verzeichnis.kopieren("Original", "Kopie")
+        self.assertEqual(sorted(self.verzeichnis.namen()), ["Kopie", "Original"])
+
+    def test_fehlende_datei(self):
+        with self.assertRaises(SpeicherFehler):
+            self.verzeichnis.laden("gibtesnicht")
+
+    def test_beschaedigte_datei_blockiert_die_liste_nicht(self):
+        self.verzeichnis.speichern(self.bau("Heil"))
+        (Path(self.ordner.name) / "kaputt.json").write_text("{kein json", encoding="utf-8")
+        self.assertEqual(self.verzeichnis.namen(), ["Heil"])
+
+    def test_name_ohne_inhalt(self):
+        with self.assertRaises(SpeicherFehler):
+            self.verzeichnis.speichern(Angebot(name="   "))
+
+
+class TestExcel(unittest.TestCase):
+    def setUp(self):
+        self.ordner = tempfile.TemporaryDirectory()
+        self.angebot = Angebot(name="Excel-Test", patient="Herr Beispiel")
+        self.angebot.hinzufuegen(Position.aus_leistung(leistung("1", 80)))
+        self.angebot.hinzufuegen(Position.aus_leistung(leistung("8", 260), anzahl=2))
+        self.angebot.zielbetrag = Decimal("100.00")
+
+    def tearDown(self):
+        self.ordner.cleanup()
+
+    def test_datei_ist_eine_gueltige_arbeitsmappe(self):
+        pfad = exportiere(self.angebot, Path(self.ordner.name) / "test.xlsx")
+        self.assertTrue(pfad.exists())
+        with zipfile.ZipFile(pfad) as archiv:
+            namen = archiv.namelist()
+            for teil in ("[Content_Types].xml", "_rels/.rels", "xl/workbook.xml",
+                         "xl/styles.xml", "xl/worksheets/sheet1.xml"):
+                self.assertIn(teil, namen)
+            blatt = archiv.read("xl/worksheets/sheet1.xml").decode()
+        self.assertIn("Excel-Test", blatt)
+        self.assertIn("Herr Beispiel", blatt)
+        self.assertIn("3,5-fach", blatt)
+
+    def test_endung_wird_ergaenzt(self):
+        pfad = exportiere(self.angebot, Path(self.ordner.name) / "ohne_endung")
+        self.assertEqual(pfad.suffix, ".xlsx")
+
+    def test_mehrere_angebote_erhalten_ein_uebersichtsblatt(self):
+        zweites = Angebot(name="Zweites")
+        zweites.hinzufuegen(Position.aus_leistung(leistung("3", 150)))
+        pfad = exportiere([self.angebot, zweites], Path(self.ordner.name) / "alle.xlsx")
+        with zipfile.ZipFile(pfad) as archiv:
+            self.assertIn("xl/worksheets/sheet3.xml", archiv.namelist())
+            self.assertIn("Uebersicht", archiv.read("xl/workbook.xml").decode())
+
+    def test_sonderzeichen_werden_maskiert(self):
+        self.angebot.beschreibung = 'Paket "A" & <B>'
+        pfad = exportiere(self.angebot, Path(self.ordner.name) / "sonder.xlsx")
+        with zipfile.ZipFile(pfad) as archiv:
+            blatt = archiv.read("xl/worksheets/sheet1.xml").decode()
+        self.assertIn("&amp;", blatt)
+        self.assertIn("&lt;B&gt;", blatt)
+
+    def test_blattnamen_werden_gekuerzt_und_bereinigt(self):
+        lang = Angebot(name="Ein sehr langer Angebotsname mit [Klammern]/Schraegstrich")
+        lang.hinzufuegen(Position.aus_leistung(leistung()))
+        pfad = exportiere(lang, Path(self.ordner.name) / "lang.xlsx")
+        with zipfile.ZipFile(pfad) as archiv:
+            workbook = archiv.read("xl/workbook.xml").decode()
+        self.assertNotIn("[", workbook.split('name="')[1].split('"')[0])
+
+
+class TestKommandozeile(unittest.TestCase):
+    def setUp(self):
+        self.ordner = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.ordner.cleanup()
+
+    def test_zifferangaben(self):
+        self.assertEqual(zerlege_ziffer("3"), ("3", 1, None))
+        self.assertEqual(zerlege_ziffer("3x2"), ("3", 2, None))
+        self.assertEqual(zerlege_ziffer("410x2@2,5"), ("410", 2, Decimal("2.5")))
+        self.assertEqual(zerlege_ziffer(" A619 "), ("A619", 1, None))
+        for falsch in ("", "abc", "3@9", "3@0,5"):
+            with self.assertRaises(Abbruch, msg=falsch):
+                zerlege_ziffer(falsch)
+
+    def test_betragseingaben(self):
+        self.assertEqual(betrag("250"), Decimal("250.00"))
+        self.assertEqual(betrag("250,50"), Decimal("250.50"))
+        self.assertEqual(betrag("1.234,50"), Decimal("1234.50"))
+        self.assertEqual(betrag("1234.50 EUR"), Decimal("1234.50"))
+        with self.assertRaises(Abbruch):
+            betrag("viel")
+
+    def _lauf(self, *argumente):
+        """Ruft die Kommandozeile auf und unterdrueckt dabei ihre Ausgabe."""
+        puffer = io.StringIO()
+        with contextlib.redirect_stdout(puffer), contextlib.redirect_stderr(puffer):
+            return main(["--verzeichnis", self.ordner.name, *argumente])
+
+    def test_ablauf_anlegen_ziel_export(self):
+        self.assertEqual(self._lauf("neu", "Paket", "-z", "1", "-z", "8", "-z", "410x2"), 0)
+        self.assertEqual(self._lauf("liste"), 0)
+        self.assertEqual(self._lauf("zeige", "Paket"), 0)
+        self.assertEqual(self._lauf("ziel", "Paket", "120,00", "--centgenau"), 0)
+        verzeichnis = Angebotsverzeichnis(self.ordner.name)
+        self.assertEqual(verzeichnis.laden("Paket").summe, Decimal("120.00"))
+        self.assertEqual(self._lauf("excel", "Paket"), 0)
+        self.assertTrue((Path(self.ordner.name) / "Paket.xlsx").exists())
+
+    def test_bearbeiten(self):
+        self._lauf("neu", "Paket", "-z", "1")
+        self.assertEqual(self._lauf("bearbeiten", "Paket", "-z", "8", "--faktor", "1=3,0"), 0)
+        angebot = Angebotsverzeichnis(self.ordner.name).laden("Paket")
+        self.assertEqual(len(angebot.positionen), 2)
+        self.assertEqual(angebot.positionen[0].faktor, Decimal("3.0"))
+        self.assertEqual(self._lauf("bearbeiten", "Paket", "--entferne", "8"), 0)
+        self.assertEqual(len(Angebotsverzeichnis(self.ordner.name).laden("Paket").positionen), 1)
+
+    def test_doppelter_name_wird_abgelehnt(self):
+        self._lauf("neu", "Paket", "-z", "1")
+        self.assertEqual(self._lauf("neu", "Paket", "-z", "3"), 2)
+        self.assertEqual(self._lauf("neu", "Paket", "-z", "3", "--ueberschreiben"), 0)
+
+    def test_unbekannte_ziffer_meldet_fehler(self):
+        self.assertEqual(self._lauf("neu", "Paket", "-z", "99999"), 2)
+
+    def test_loeschen(self):
+        self._lauf("neu", "Paket", "-z", "1")
+        self.assertEqual(self._lauf("loeschen", "Paket"), 0)
+        self.assertEqual(self._lauf("loeschen", "Paket"), 2)
+
+    def test_katalog_import(self):
+        quelle = Path(self.ordner.name) / "eigene.csv"
+        quelle.write_text("nummer;bezeichnung;punktzahl\n9001;Eigene Leistung;400\n",
+                          encoding="utf-8")
+        ziel = Path(self.ordner.name) / "katalog.csv"
+        self.assertEqual(self._lauf("katalog-import", str(quelle), "--ziel", str(ziel)), 0)
+        self.assertIn("9001", Katalog.laden(ziel))
+
+    def test_katalog_anzeige(self):
+        self.assertEqual(self._lauf("katalog", "beratung"), 0)
+        self.assertEqual(self._lauf("katalog", "gibtesnicht"), 1)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

@@ -1,0 +1,52 @@
+# GOAE-Startkatalog fuer den Abrechnungskalkulator
+# ACHTUNG: Startdatensatz zum sofortigen Arbeiten - KEINE amtliche Quelle.
+# Bitte vor produktivem Einsatz gegen die amtliche GOAE pruefen bzw. den
+# eigenen Katalog importieren (Menue "Katalog > CSV importieren" bzw.
+# "kalkulator.py katalog-import <datei.csv>").
+#
+# Spalten:
+#   nummer          GOAE-Ziffer (Text, z.B. "1", "250", "A619")
+#   bezeichnung     Leistungslegende (Kurzform)
+#   punktzahl       Punktzahl nach GOAE
+#   abschnitt       GOAE-Abschnitt (B, C, ...)
+#   klasse          Steigerungsklasse: aerztlich | technisch | labor
+#   regelsatz       Regelhoechstsatz (Schwellenwert) dieser Klasse
+#   hoechstsatz     Hoechstsatz dieser Klasse
+nummer;bezeichnung;punktzahl;abschnitt;klasse;regelsatz;hoechstsatz
+1;Beratung - auch mittels Fernsprecher;80;B;aerztlich;2.3;3.5
+2;Ausstellung von Wiederholungsrezepten/Ueberweisungen ohne Inanspruchnahme;40;B;aerztlich;2.3;3.5
+3;Eingehende Beratung (mindestens 10 Minuten Dauer);150;B;aerztlich;2.3;3.5
+4;Erhebung der Fremdanamnese und/oder Unterweisung einer Bezugsperson;220;B;aerztlich;2.3;3.5
+5;Symptombezogene Untersuchung;80;B;aerztlich;2.3;3.5
+6;Vollstaendige koerperliche Untersuchung eines Organsystems;100;B;aerztlich;2.3;3.5
+7;Vollstaendige koerperliche Untersuchung mindestens eines Organsystems;160;B;aerztlich;2.3;3.5
+8;Untersuchung zur Erhebung des Ganzkoerperstatus;260;B;aerztlich;2.3;3.5
+15;Einleitung und Koordination flankierender therapeutischer Massnahmen;300;B;aerztlich;2.3;3.5
+34;Eroerterung (mindestens 20 Minuten) bei nachhaltig lebensveraendernder Erkrankung;300;B;aerztlich;2.3;3.5
+45;Visite im Krankenhaus;70;B;aerztlich;2.3;3.5
+48;Besuch eines Kranken in einer Anstalt oder einem Heim;120;B;aerztlich;2.3;3.5
+50;Besuch, einschliesslich Beratung und symptombezogener Untersuchung;325;B;aerztlich;2.3;3.5
+51;Besuch eines weiteren Kranken in derselben haeuslichen Gemeinschaft;130;B;aerztlich;2.3;3.5
+56;Verweilen, ohne Unterbrechung, je angefangene halbe Stunde;180;B;aerztlich;2.3;3.5
+70;Kurze Bescheinigung oder kurzes Zeugnis;40;C;aerztlich;2.3;3.5
+75;Ausfuehrlicher schriftlicher Krankheits- und Befundbericht;130;C;aerztlich;2.3;3.5
+80;Schriftliche gutachtliche Aeusserung;300;C;aerztlich;2.3;3.5
+250;Blutentnahme mittels Spritze oder Kanuele (Vene);40;C;aerztlich;2.3;3.5
+252;Injektion, subkutan, submukoes, intrakutan oder intramuskulaer;70;C;aerztlich;2.3;3.5
+253;Injektion, intravenoes;70;C;aerztlich;2.3;3.5
+261;Injektion in einen Gelenkraum oder Schleimbeutel;130;C;aerztlich;2.3;3.5
+271;Infusion, intravenoes, bis zu 30 Minuten Dauer;120;C;aerztlich;2.3;3.5
+272;Infusion, intravenoes, mehr als 30 Minuten Dauer;180;C;aerztlich;2.3;3.5
+410;Ultraschalluntersuchung eines Organs;200;O;technisch;1.8;2.5
+420;Ultraschalluntersuchung - Zuschlag je weiterem Organ;80;O;technisch;1.8;2.5
+602;Ganzkoerperplethysmographische Untersuchung;300;E;technisch;1.8;2.5
+605;Ruhespirographische Untersuchung;150;E;technisch;1.8;2.5
+650;Elektrokardiographische Untersuchung in Ruhe;253;E;technisch;1.8;2.5
+651;Elektrokardiographische Untersuchung unter fortschreitender Belastung;506;E;technisch;1.8;2.5
+652;Elektrokardiographische Untersuchung mittels Langzeitmessung;506;E;technisch;1.8;2.5
+3511;Glukose (Blutzucker);30;M;labor;1.15;1.3
+3541;Kreatinin;40;M;labor;1.15;1.3
+3562;Cholesterin gesamt;30;M;labor;1.15;1.3
+3565;Triglyceride;30;M;labor;1.15;1.3
+3583;TSH (Thyreotropin);120;M;labor;1.15;1.3
+3550;Blutbild, grosses (Haemogramm mit Differenzierung);60;M;labor;1.15;1.3
