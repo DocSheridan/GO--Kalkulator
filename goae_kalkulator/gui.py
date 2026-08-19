@@ -35,6 +35,7 @@ KATALOG_SPALTEN = (
     ("e1", "1,0-fach", 72, "e"),
     ("e23", "2,3-fach", 72, "e"),
     ("e35", "3,5-fach", 72, "e"),
+    ("klasse", "Abschn./Klasse", 108, "w"),
 )
 POSITION_SPALTEN = (
     ("nummer", "Ziffer", 62, "w"),
@@ -281,7 +282,9 @@ class Anwendung(tk.Tk):
                 "", "end", iid=leistung.nummer,
                 values=(leistung.nummer, leistung.bezeichnung, leistung.punktzahl,
                         geld(leistung.einfachsatz), geld(leistung.satz_2_3),
-                        geld(leistung.satz_3_5)),
+                        geld(leistung.satz_3_5),
+                        f"{leistung.abschnitt} / {leistung.klasse}"
+                        + (" *" if leistung.herkunft == "gruppe" else "")),
             )
 
     def _aktualisiere(self) -> None:

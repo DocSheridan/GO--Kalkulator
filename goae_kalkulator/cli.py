@@ -15,7 +15,7 @@ from .speicher import Angebotsverzeichnis, SpeicherFehler
 from .zielbetrag import STRATEGIEN, optimiere_faktoren
 
 ZIFFER_MUSTER = re.compile(
-    r"^\s*(?P<nummer>[A-Za-z]?\d+[A-Za-z]?)\s*(?:[x*]\s*(?P<anzahl>\d+))?"
+    r"^\s*(?P<nummer>[A-Za-z][ ]?\d+[a-zA-Z]?|\d+[a-zA-Z]?)\s*(?:[x*]\s*(?P<anzahl>\d+))?"
     r"\s*(?:@\s*(?P<faktor>[\d.,]+))?\s*$"
 )
 
@@ -101,13 +101,16 @@ def katalog_tabelle(leistungen, grenze: int | None = None) -> str:
     gekuerzt = leistungen[:grenze] if grenze else leistungen
     zeilen = [
         [l.nummer, l.bezeichnung[:52], str(l.punktzahl),
-         geld(l.einfachsatz), geld(l.satz_2_3), geld(l.satz_3_5), l.klasse]
+         geld(l.einfachsatz), geld(l.satz_2_3), geld(l.satz_3_5),
+         f"{l.abschnitt} / {l.klasse}" + (" *" if l.herkunft == "gruppe" else "")]
         for l in gekuerzt
     ]
     text = tabelle(
-        ["Ziffer", "Leistung", "Punkte", "1,0-fach", "2,3-fach", "3,5-fach", "Klasse"],
+        ["Ziffer", "Leistung", "Punkte", "1,0-fach", "2,3-fach", "3,5-fach", "Abschn./Klasse"],
         zeilen, rechts={2, 3, 4, 5},
     )
+    if any(l.herkunft == "gruppe" for l in gekuerzt):
+        text += "\n* Punktzahl gilt im Verzeichnis fuer eine Gruppe von Nummern."
     if grenze and len(leistungen) > grenze:
         text += f"\n... {len(leistungen) - grenze} weitere Treffer (Suchbegriff eingrenzen)"
     return text

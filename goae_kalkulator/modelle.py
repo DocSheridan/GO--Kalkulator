@@ -73,6 +73,9 @@ class Leistung:
     klasse: str = "aerztlich"
     regelsatz: Decimal = Decimal("2.3")
     hoechstsatz: Decimal = Decimal("3.5")
+    # "eigen" = Punktzahl steht bei dieser Nummer, "gruppe" = sie gilt im
+    # Verzeichnis fuer eine Gruppe von Nummern (verbundene Zelle).
+    herkunft: str = "eigen"
 
     @property
     def einfachsatz(self) -> Decimal:
@@ -105,6 +108,7 @@ class Position:
     regelsatz: Decimal = Decimal("2.3")
     hoechstsatz: Decimal = Decimal("3.5")
     begruendung: str = ""
+    herkunft: str = "eigen"
 
     def __post_init__(self) -> None:
         self.faktor = faktor(self.faktor)
@@ -161,6 +165,8 @@ class Position:
             return f"Faktor > Hoechstsatz {faktor_text(self.hoechstsatz)} ({self.klasse})"
         if self.ueber_regelsatz and not self.begruendung:
             return "Begruendung erforderlich (> Regelsatz)"
+        if self.herkunft == "gruppe":
+            return "Punktzahl gilt im Verzeichnis fuer eine Gruppe von Nummern"
         return ""
 
     # -- Serialisierung ---------------------------------------------------
@@ -177,6 +183,7 @@ class Position:
             "regelsatz": str(self.regelsatz),
             "hoechstsatz": str(self.hoechstsatz),
             "begruendung": self.begruendung,
+            "herkunft": self.herkunft,
         }
 
     @classmethod
@@ -193,6 +200,7 @@ class Position:
             regelsatz=Decimal(str(daten.get("regelsatz", "2.3"))),
             hoechstsatz=Decimal(str(daten.get("hoechstsatz", "3.5"))),
             begruendung=daten.get("begruendung", ""),
+            herkunft=daten.get("herkunft", "eigen"),
         )
 
     @classmethod
@@ -209,6 +217,7 @@ class Position:
             klasse=leistung.klasse,
             regelsatz=leistung.regelsatz,
             hoechstsatz=leistung.hoechstsatz,
+            herkunft=leistung.herkunft,
         )
 
 

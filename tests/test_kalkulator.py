@@ -149,6 +149,92 @@ class TestKatalog(unittest.TestCase):
         self.assertEqual(self.katalog.hole("1").punktzahl, 999)
 
 
+class TestMitgelieferterKatalog(unittest.TestCase):
+    """Prueft den aus dem amtlichen GOAE-Text erzeugten Katalog."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.katalog = Katalog.laden()
+
+    def test_umfang(self):
+        # Das Gebuehrenverzeichnis umfasst rund 2 700 bepunktete Nummern.
+        self.assertGreater(len(self.katalog), 2500)
+
+    def test_bekannte_betraege(self):
+        for nummer, punkte, einfach, satz23, satz35 in [
+            ("1", 80, "4.66", "10.72", "16.32"),
+            ("3", 150, "8.74", "20.11", "30.60"),
+            ("8", 260, "15.15", "34.86", "53.04"),
+            ("5", 80, "4.66", "10.72", "16.32"),
+        ]:
+            l = self.katalog.hole(nummer)
+            self.assertEqual(l.punktzahl, punkte, f"Ziffer {nummer}")
+            self.assertEqual(l.einfachsatz, Decimal(einfach), f"Ziffer {nummer}")
+            self.assertEqual(l.satz_2_3, Decimal(satz23), f"Ziffer {nummer}")
+            self.assertEqual(l.satz_3_5, Decimal(satz35), f"Ziffer {nummer}")
+
+    def test_abschnittsgrenzen(self):
+        for nummer, abschnitt in [("1", "B"), ("109", "B"), ("200", "C"), ("449", "C"),
+                                  ("450", "D"), ("500", "E"), ("600", "F"), ("800", "G"),
+                                  ("1001", "H"), ("1200", "I"), ("1400", "J"), ("1700", "K"),
+                                  ("2000", "L"), ("3500", "M"), ("4800", "N"), ("5000", "O"),
+                                  ("6000", "P")]:
+            self.assertEqual(self.katalog.hole(nummer).abschnitt, abschnitt, f"Ziffer {nummer}")
+
+    def test_steigerungsklassen_nach_paragraf_5(self):
+        """§ 5 Abs. 3: Abschnitte A, E, O -> 1,8/2,5; Abs. 4: Abschnitt M und Nr. 437."""
+        erwartet = {
+            "1": "aerztlich",     # Abs. 2
+            "2": "technisch",     # in Abschnitt A namentlich genannt
+            "56": "technisch",    # in Abschnitt A namentlich genannt
+            "250": "technisch",   # in Abschnitt A namentlich genannt
+            "250a": "technisch",  # in Abschnitt A namentlich genannt
+            "410": "aerztlich",   # Sonographie: nicht in Abschnitt A
+            "437": "labor",       # Abs. 4 nennt Nummer 437 ausdruecklich
+            "500": "technisch",   # Abschnitt E
+            "650": "technisch",   # in Abschnitt A namentlich genannt
+            "652": "aerztlich",   # nicht in Abschnitt A
+            "3511": "labor",      # Abschnitt M
+            "4800": "aerztlich",  # Abschnitt N, Histologie
+            "4850": "technisch",  # Abschnitt N, Zytologie: in Abschnitt A genannt
+            "5000": "technisch",  # Abschnitt O
+            "6000": "aerztlich",  # Abschnitt P
+        }
+        for nummer, klasse in erwartet.items():
+            l = self.katalog.hole(nummer)
+            self.assertEqual(l.klasse, klasse, f"Ziffer {nummer}")
+
+    def test_saetze_passen_zur_klasse(self):
+        paare = {"aerztlich": (Decimal("2.3"), Decimal("3.5")),
+                 "technisch": (Decimal("1.8"), Decimal("2.5")),
+                 "labor": (Decimal("1.15"), Decimal("1.3"))}
+        for l in self.katalog:
+            self.assertEqual((l.regelsatz, l.hoechstsatz), paare[l.klasse], f"Ziffer {l.nummer}")
+
+    def test_jede_ziffer_hat_punktzahl_und_legende(self):
+        for l in self.katalog:
+            self.assertGreater(l.punktzahl, 0, f"Ziffer {l.nummer}")
+            self.assertTrue(l.bezeichnung.strip(), f"Ziffer {l.nummer}")
+            self.assertIn(l.herkunft, ("eigen", "gruppe"), f"Ziffer {l.nummer}")
+
+    def test_buchstabenzusatz_sortiert_hinter_der_grundnummer(self):
+        nummern = [l.nummer for l in self.katalog]
+        self.assertEqual(nummern[nummern.index("250"):nummern.index("250") + 3],
+                         ["250", "250a", "251"])
+
+    def test_gruppenpunktzahl_wird_gekennzeichnet(self):
+        # Nr. 3514 (Glukose) teilt sich die Punktzahl mit dem Gruppeneintrag 3511.
+        glukose = self.katalog.hole("3514")
+        self.assertEqual(glukose.herkunft, "gruppe")
+        self.assertEqual(glukose.punktzahl, self.katalog.hole("3511").punktzahl)
+        position = Position.aus_leistung(glukose, faktorwert=Decimal("1.15"))
+        self.assertIn("Gruppe", position.hinweis())
+
+    def test_zuschlagsziffern_mit_leerzeichen(self):
+        self.assertEqual(zerlege_ziffer("K 2"), ("K 2", 1, None))
+        self.assertEqual(self.katalog.hole("K 2").punktzahl, 120)
+
+
 class TestZielbetrag(unittest.TestCase):
     def bau(self):
         angebot = Angebot(name="Ziel")

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -11,7 +12,8 @@ from .modelle import KLASSEN, Leistung
 
 STANDARD_KATALOG = Path(__file__).resolve().parent.parent / "daten" / "goae_katalog.csv"
 
-SPALTEN = ("nummer", "bezeichnung", "punktzahl", "abschnitt", "klasse", "regelsatz", "hoechstsatz")
+SPALTEN = ("nummer", "bezeichnung", "punktzahl", "abschnitt", "klasse",
+           "regelsatz", "hoechstsatz", "herkunft")
 
 
 class KatalogFehler(Exception):
@@ -89,6 +91,7 @@ class Katalog:
                     klasse=klasse if klasse in KLASSEN else "aerztlich",
                     regelsatz=_dezimal(daten.get("regelsatz", ""), str(regel_std)),
                     hoechstsatz=_dezimal(daten.get("hoechstsatz", ""), str(hoechst_std)),
+                    herkunft=(daten.get("herkunft") or "eigen").lower(),
                 )
             )
         if not leistungen:
@@ -142,14 +145,19 @@ class Katalog:
             for l in self.alle():
                 schreiber.writerow(
                     [l.nummer, l.bezeichnung, l.punktzahl, l.abschnitt, l.klasse,
-                     l.regelsatz, l.hoechstsatz]
+                     l.regelsatz, l.hoechstsatz, l.herkunft]
                 )
         return pfad
 
 
+_NUMMER_MUSTER = re.compile(r"^([^\d]*)(\d*)(.*)$")
+
+
 def _sortierschluessel(leistung: Leistung) -> tuple:
-    """Ziffern numerisch sortieren, alphanumerische Ziffern (z.B. A619) danach."""
-    nummer = leistung.nummer
-    ziffern = "".join(c for c in nummer if c.isdigit())
-    praefix = "".join(c for c in nummer if not c.isdigit())
-    return (praefix, int(ziffern) if ziffern else 0, nummer)
+    """Nach Zahlenwert sortieren; ein Buchstabenzusatz folgt seiner Grundnummer.
+
+    So steht 250a hinter 250 und vor 251; Zuschlaege mit Buchstabenpraefix
+    (K 1, K 2) stehen am Ende.
+    """
+    praefix, ziffern, suffix = _NUMMER_MUSTER.match(leistung.nummer).groups()
+    return (praefix.strip().lower(), int(ziffern) if ziffern else 0, suffix.lower())
