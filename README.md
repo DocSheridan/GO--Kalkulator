@@ -216,6 +216,8 @@ werkzeuge/
   katalog_erzeugen.py         Katalog aus dem amtlichen GOÄ-Text erzeugen
   katalog_fuer_app.py         Katalog für die Smartphone-App aufbereiten
   pruefvektoren.py            Prüfvektoren für den Abgleich mit der App
+  symbole_erzeugen.py         App-Symbole in den Praxisfarben
+  praxislogo.png              Logo der Praxis, Quelle der Farbwerte
 app/                          Smartphone-App (siehe app/README.md)
 .github/workflows/pages.yml   Tests und Veröffentlichung der App
 tests/test_kalkulator.py      Testfälle

@@ -77,6 +77,33 @@ nach § 12 GOÄ nötig), über dem Höchstsatz der Steigerungsklasse rot.
 Teilen-Menü – von dort in Mail, Dateien, Drive oder direkt in eine
 Tabellen-App. Fehlt die Teilen-Funktion, wird die Datei heruntergeladen.
 
+## Erscheinungsbild
+
+Symbol und Oberfläche verwenden die Farben der Praxis, ausgelesen aus
+`werkzeuge/praxislogo.png`:
+
+| Farbe | Verwendung |
+|---|---|
+| `#6C7569` Grün der Logofläche | Kopfzeile, Summen, Hauptknöpfe, Ziffernnummern |
+| `#B7C4AF` Hellgrün des Strangs | Balken im Symbol, Markenton im dunklen Erscheinungsbild |
+| `#585857` Grau der Wortmarke | Nebentexte |
+
+Die App folgt der Einstellung des Geräts und erscheint hell oder dunkel. Alle
+Farbpaare erreichen die Kontrastwerte für Fließtext (mindestens 4,5:1); kleine
+Schrift auf Eingabeflächen nutzt deshalb den kräftigeren Ton `#4D5649`.
+
+Das Symbol wird erzeugt mit:
+
+```bash
+python3 werkzeuge/symbole_erzeugen.py
+```
+
+Ändern sich die Praxisfarben, genügt es, `werkzeuge/praxislogo.png` zu
+ersetzen, die Farbwerte im Kopf des Skripts sowie die Variablen in `app.css`
+anzupassen und das Skript erneut laufen zu lassen. Nach jeder Symboländerung
+ist die Version in `sw.js` zu erhöhen – sonst zeigen bereits installierte
+Geräte weiter das alte Symbol aus ihrem Zwischenspeicher.
+
 ## Wo die Daten liegen
 
 Angebote und Patientenangaben werden **ausschließlich auf dem Gerät**

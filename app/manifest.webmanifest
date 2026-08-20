@@ -8,8 +8,8 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f4f6f9",
-  "theme_color": "#1f4e79",
+  "background_color": "#f1f3ef",
+  "theme_color": "#6c7569",
   "categories": ["medical", "productivity", "finance"],
   "icons": [
     { "src": "symbole/symbol-192.png", "sizes": "192x192", "type": "image/png" },

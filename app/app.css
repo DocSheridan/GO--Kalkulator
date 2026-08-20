@@ -1,17 +1,20 @@
 /* GOAE-Kalkulator - Gestaltung fuer Telefone (iOS und Android). */
 
 :root {
-  --grund: #f4f6f9;
+  /* Farben der Praxis, entnommen aus werkzeuge/praxislogo.png:
+     #6C7569 Grün der Logofläche, #B7C4AF Hellgrün des Strangs,
+     #585857 Grau der Wortmarke. Die übrigen Werte sind daraus abgeleitet. */
+  --grund: #f1f3ef;
   --flaeche: #ffffff;
-  --flaeche-2: #eef2f7;
-  --linie: #d5dde6;
-  --text: #16202b;
-  --text-leise: #5b6a7a;
-  --marke: #1f4e79;
-  --marke-hell: #2f6da8;
-  --warnung: #b45309;
-  --fehler: #b91c1c;
-  --gut: #15803d;
+  --flaeche-2: #e8ece4;
+  --linie: #ccd3c6;
+  --text: #23261f;
+  --text-leise: #585857;
+  --marke: #6c7569;
+  --marke-stark: #4d5649;
+  --warnung: #9a5800;
+  --fehler: #a3201a;
+  --gut: #4a6b45;
   --radius: 14px;
   --tippziel: 44px;
   --unten: calc(env(safe-area-inset-bottom, 0px));
@@ -19,17 +22,17 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --grund: #0f1720;
-    --flaeche: #172230;
-    --flaeche-2: #1e2c3c;
-    --linie: #2c3d51;
-    --text: #e8eef5;
-    --text-leise: #9db0c4;
-    --marke: #7db3e8;
-    --marke-hell: #9cc8f5;
-    --warnung: #f0a868;
-    --fehler: #f4837c;
-    --gut: #7ddba0;
+    --grund: #171a15;
+    --flaeche: #20241e;
+    --flaeche-2: #2a2f27;
+    --linie: #3c4337;
+    --text: #e9ece6;
+    --text-leise: #a9b3a4;
+    --marke: #b7c4af;
+    --marke-stark: #cfd9c8;
+    --warnung: #e0a86a;
+    --fehler: #eb8a83;
+    --gut: #8fca86;
   }
 }
 
@@ -62,7 +65,7 @@ body {
   background: var(--marke);
   color: #fff;
 }
-@media (prefers-color-scheme: dark) { .kopf { background: #0f1b26; } }
+@media (prefers-color-scheme: dark) { .kopf { background: #2b3128; } }
 
 .kopf h1 { margin: 0; font-size: 1.05rem; font-weight: 650; letter-spacing: .2px; }
 .kopf-titel { flex: 1; min-width: 0; }
@@ -129,7 +132,7 @@ main { padding: 12px 12px 0; max-width: 760px; margin: 0 auto; }
   padding-right: 34px;
 }
 .feld input:focus, .feld select:focus, .suchleiste input:focus {
-  outline: 2px solid var(--marke-hell);
+  outline: 2px solid var(--marke-stark);
   outline-offset: 1px;
 }
 .feld-paar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -144,14 +147,16 @@ main { padding: 12px 12px 0; max-width: 760px; margin: 0 auto; }
   padding: 10px 16px;
   font: inherit;
   font-weight: 600;
-  color: var(--marke);
+  /* Der kräftigere Ton, weil kleine Schrift auf der Eingabefläche sonst
+     unter dem Kontrastmindestwert bliebe. */
+  color: var(--marke-stark);
   background: var(--flaeche-2);
   border: 1px solid var(--linie);
   border-radius: 10px;
   cursor: pointer;
 }
 .knopf.haupt { background: var(--marke); border-color: var(--marke); color: #fff; }
-@media (prefers-color-scheme: dark) { .knopf.haupt { color: #0f1720; } }
+@media (prefers-color-scheme: dark) { .knopf.haupt { color: #171a15; } }
 .knopf.gross { width: 100%; margin-bottom: 12px; }
 .knopf:active { transform: scale(.985); }
 .knopfreihe { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -225,7 +230,7 @@ main { padding: 12px 12px 0; max-width: 760px; margin: 0 auto; }
 .stufe button {
   width: 38px; height: 40px;
   border: none; background: transparent;
-  color: var(--marke); font-size: 1.25rem; line-height: 1;
+  color: var(--marke-stark); font-size: 1.25rem; line-height: 1;
 }
 .stufe input {
   width: 62px; height: 40px;
@@ -241,7 +246,7 @@ main { padding: 12px 12px 0; max-width: 760px; margin: 0 auto; }
   font-size: .95rem;
 }
 .fix-knopf[aria-pressed="true"] { background: var(--marke); border-color: var(--marke); color: #fff; }
-@media (prefers-color-scheme: dark) { .fix-knopf[aria-pressed="true"] { color: #0f1720; } }
+@media (prefers-color-scheme: dark) { .fix-knopf[aria-pressed="true"] { color: #171a15; } }
 .position-betrag {
   margin-left: auto;
   font-size: 1.12rem;
@@ -402,7 +407,7 @@ main { padding: 12px 12px 0; max-width: 760px; margin: 0 auto; }
   max-width: 92vw;
   padding: 10px 16px;
   border-radius: 22px;
-  background: #16202bee;
+  background: #23261fee;
   color: #fff;
   font-size: .84rem;
   text-align: center;
