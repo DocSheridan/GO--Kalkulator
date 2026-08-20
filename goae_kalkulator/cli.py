@@ -8,16 +8,18 @@ import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from .eigene import EigeneFehler, EigeneZiffern, katalog_mit_eigenen
 from .excel import exportiere
 from .katalog import Katalog, KatalogFehler, STANDARD_KATALOG
 from .modelle import MAX_FAKTOR, MIN_FAKTOR, Angebot, Position, faktor_text, geld
 from .speicher import Angebotsverzeichnis, SpeicherFehler
 from .zielbetrag import STRATEGIEN, optimiere_faktoren
 
-ZIFFER_MUSTER = re.compile(
-    r"^\s*(?P<nummer>[A-Za-z][ ]?\d+[a-zA-Z]?|\d+[a-zA-Z]?)\s*(?:[x*]\s*(?P<anzahl>\d+))?"
-    r"\s*(?:@\s*(?P<faktor>[\d.,]+))?\s*$"
-)
+# Eigene Analogziffern duerfen frei benannt sein (A-AKU, "Praxis 1"), deshalb
+# wird die Angabe von rechts zerlegt: erst der Faktor hinter "@", dann die
+# Anzahl hinter einem abschliessenden "x". Alles davor ist die Nummer.
+ANZAHL_MUSTER = re.compile(r"^(?P<nummer>.*[^\sx*])\s*[x*]\s*(?P<anzahl>\d+)$", re.IGNORECASE)
+NUMMER_MUSTER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .\-]{0,15}$")
 
 
 class Abbruch(Exception):
@@ -40,20 +42,36 @@ def betrag(text: str) -> Decimal:
 
 
 def zerlege_ziffer(text: str) -> tuple[str, int, Decimal | None]:
-    """'3x2@2,5' -> ('3', 2, Decimal('2.5'))."""
-    treffer = ZIFFER_MUSTER.match(text)
-    if not treffer:
+    """'3x2@2,5' -> ('3', 2, Decimal('2.5')); auch 'A-AKU' oder 'K 2'."""
+    rest = str(text or "").strip()
+    if not rest:
+        raise Abbruch("Es wurde keine Ziffer angegeben.")
+
+    faktorwert = None
+    if "@" in rest:
+        rest, _, roh = rest.rpartition("@")
+        roh = roh.strip().replace(",", ".")
+        try:
+            faktorwert = Decimal(roh)
+        except InvalidOperation as fehler:
+            raise Abbruch(f"{roh!r} ist kein gueltiger Faktor.") from fehler
+        if not (MIN_FAKTOR <= faktorwert <= MAX_FAKTOR):
+            raise Abbruch(f"Der Faktor muss zwischen {MIN_FAKTOR} und {MAX_FAKTOR} liegen.")
+
+    anzahl = 1
+    treffer = ANZAHL_MUSTER.match(rest.strip())
+    if treffer:
+        rest = treffer.group("nummer")
+        anzahl = int(treffer.group("anzahl"))
+        if anzahl < 1:
+            raise Abbruch("Die Anzahl muss mindestens 1 betragen.")
+
+    nummer = rest.strip()
+    if not NUMMER_MUSTER.match(nummer):
         raise Abbruch(
-            f"{text!r} ist keine gueltige Angabe. Erwartet: NUMMER[xANZAHL][@FAKTOR], z.B. 3x2@2,5"
+            f"{text!r} ist keine gueltige Angabe. Erwartet: NUMMER[xANZAHL][@FAKTOR], "
+            "z.B. 3x2@2,5"
         )
-    nummer = treffer.group("nummer")
-    anzahl = int(treffer.group("anzahl") or 1)
-    roh_faktor = treffer.group("faktor")
-    faktorwert = Decimal(roh_faktor.replace(",", ".")) if roh_faktor else None
-    if anzahl < 1:
-        raise Abbruch("Die Anzahl muss mindestens 1 betragen.")
-    if faktorwert is not None and not (MIN_FAKTOR <= faktorwert <= MAX_FAKTOR):
-        raise Abbruch(f"Der Faktor muss zwischen {MIN_FAKTOR} und {MAX_FAKTOR} liegen.")
     return nummer, anzahl, faktorwert
 
 
@@ -102,7 +120,8 @@ def katalog_tabelle(leistungen, grenze: int | None = None) -> str:
     zeilen = [
         [l.nummer, l.bezeichnung[:52], str(l.punktzahl),
          geld(l.einfachsatz), geld(l.satz_2_3), geld(l.satz_3_5),
-         f"{l.abschnitt} / {l.klasse}" + (" *" if l.herkunft == "gruppe" else "")]
+         (f"analog {l.analog_zu}" if l.herkunft == "analog"
+          else f"{l.abschnitt} / {l.klasse}" + (" *" if l.herkunft == "gruppe" else ""))]
         for l in gekuerzt
     ]
     text = tabelle(
@@ -116,10 +135,20 @@ def katalog_tabelle(leistungen, grenze: int | None = None) -> str:
     return text
 
 
-def lade_katalog(pfad: str | None) -> Katalog:
+def lade_amtlichen_katalog(pfad: str | None) -> Katalog:
+    """Nur das amtliche Verzeichnis, ohne die eigenen Ziffern."""
     try:
         return Katalog.laden(pfad)
     except KatalogFehler as fehler:
+        raise Abbruch(str(fehler)) from fehler
+
+
+def lade_katalog(pfad: str | None, verzeichnis: str | None = None) -> Katalog:
+    """Amtlicher Katalog, ergaenzt um die eigenen Analogziffern."""
+    katalog = lade_amtlichen_katalog(pfad)
+    try:
+        return katalog_mit_eigenen(katalog, EigeneZiffern(verzeichnis))
+    except EigeneFehler as fehler:
         raise Abbruch(str(fehler)) from fehler
 
 
@@ -135,7 +164,7 @@ def position_aus(katalog: Katalog, angabe: str) -> Position:
 # -- Befehle --------------------------------------------------------------
 
 def befehl_katalog(args) -> int:
-    katalog = lade_katalog(args.katalog)
+    katalog = lade_katalog(args.katalog, args.verzeichnis)
     treffer = katalog.suche(args.suche or "")
     if not treffer:
         print(f"Keine Ziffer passt zu {args.suche!r}.")
@@ -179,7 +208,7 @@ def befehl_zeige(args) -> int:
 
 
 def befehl_neu(args) -> int:
-    katalog = lade_katalog(args.katalog)
+    katalog = lade_katalog(args.katalog, args.verzeichnis)
     verzeichnis = Angebotsverzeichnis(args.verzeichnis)
     if verzeichnis.existiert(args.name) and not args.ueberschreiben:
         raise Abbruch(
@@ -205,7 +234,7 @@ def befehl_neu(args) -> int:
 
 
 def befehl_bearbeiten(args) -> int:
-    katalog = lade_katalog(args.katalog)
+    katalog = lade_katalog(args.katalog, args.verzeichnis)
     verzeichnis = Angebotsverzeichnis(args.verzeichnis)
     try:
         angebot = verzeichnis.laden(args.name)
@@ -316,6 +345,56 @@ def befehl_loeschen(args) -> int:
     return 0
 
 
+def befehl_eigene_liste(args) -> int:
+    eigene = EigeneZiffern(args.verzeichnis)
+    ziffern = eigene.alle()
+    if not ziffern:
+        print(f"Noch keine eigenen Ziffern in {eigene.datei}")
+        return 0
+    zeilen = [
+        [l.nummer, l.bezeichnung[:46], l.analog_zu, str(l.punktzahl),
+         geld(l.einfachsatz), geld(l.satz_2_3), geld(l.satz_3_5), l.klasse]
+        for l in ziffern
+    ]
+    print(tabelle(["Nummer", "Leistung", "analog zu", "Punkte",
+                   "1,0-fach", "2,3-fach", "3,5-fach", "Klasse"],
+                  zeilen, rechts={3, 4, 5, 6}))
+    print(f"\n{len(ziffern)} eigene Ziffer(n) in {eigene.datei}")
+    return 0
+
+
+def befehl_eigene_neu(args) -> int:
+    katalog = lade_amtlichen_katalog(args.katalog)
+    eigene = EigeneZiffern(args.verzeichnis)
+    try:
+        leistung = eigene.anlegen(
+            katalog, bezeichnung=args.bezeichnung, analog_zu=args.analog_zu,
+            nummer=args.nummer,
+        )
+    except EigeneFehler as fehler:
+        raise Abbruch(str(fehler)) from fehler
+    vorlage = katalog.hole(args.analog_zu)
+    print(f"Angelegt: {leistung.nummer}  {leistung.bezeichnung}")
+    print(f"  entsprechend Nr. {leistung.analog_zu} ({vorlage.bezeichnung[:50]})")
+    print(f"  {leistung.punktzahl} Punkte, Klasse {leistung.klasse} "
+          f"(Regelsatz {faktor_text(leistung.regelsatz)}, "
+          f"Hoechstsatz {faktor_text(leistung.hoechstsatz)})")
+    print(f"  {geld(leistung.einfachsatz)} / {geld(leistung.satz_2_3)} / "
+          f"{geld(leistung.satz_3_5)} EUR")
+    print(f"\nGespeichert in {eigene.datei}")
+    return 0
+
+
+def befehl_eigene_loeschen(args) -> int:
+    eigene = EigeneZiffern(args.verzeichnis)
+    try:
+        entfernt = eigene.loeschen(args.nummer)
+    except EigeneFehler as fehler:
+        raise Abbruch(str(fehler)) from fehler
+    print(f"Geloescht: {entfernt.nummer}  {entfernt.bezeichnung}")
+    return 0
+
+
 def befehl_katalog_import(args) -> int:
     try:
         neu = Katalog.laden(args.datei)
@@ -423,7 +502,22 @@ def baue_parser() -> argparse.ArgumentParser:
     p.add_argument("name")
     p.set_defaults(funktion=befehl_loeschen)
 
-    p = unter.add_parser("katalog-import", help="eigene GOAE-Ziffern aus CSV uebernehmen")
+    p = unter.add_parser("eigene", help="eigene Analogziffern verwalten (§ 6 Abs. 2 GOAE)")
+    eigen_unter = p.add_subparsers(dest="unterbefehl")
+    q = eigen_unter.add_parser("liste", help="eigene Ziffern anzeigen")
+    q.set_defaults(funktion=befehl_eigene_liste)
+    q = eigen_unter.add_parser("neu", help="Analogziffer anlegen")
+    q.add_argument("bezeichnung", help="die tatsaechlich erbrachte Leistung")
+    q.add_argument("analog_zu", metavar="ANALOG-ZU",
+                   help="herangezogene Ziffer des Gebuehrenverzeichnisses")
+    q.add_argument("--nummer", help="eigene Nummer (Vorgabe: A + herangezogene Nummer)")
+    q.set_defaults(funktion=befehl_eigene_neu)
+    q = eigen_unter.add_parser("loeschen", help="eigene Ziffer entfernen")
+    q.add_argument("nummer")
+    q.set_defaults(funktion=befehl_eigene_loeschen)
+    p.set_defaults(funktion=befehl_eigene_liste)
+
+    p = unter.add_parser("katalog-import", help="fremde GOAE-Ziffern aus CSV uebernehmen")
     p.add_argument("datei")
     p.add_argument("--ziel", help="Zielkatalog (Vorgabe: mitgelieferter Katalog)")
     p.add_argument("--ersetzen", action="store_true", help="vorhandenen Katalog ersetzen")

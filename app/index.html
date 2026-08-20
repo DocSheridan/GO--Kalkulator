@@ -104,6 +104,21 @@
 
   <!-- ------------------------------------------------ Katalog -->
   <section id="ansicht-katalog" class="ansicht" aria-label="Katalog" hidden>
+    <div class="eigene-leiste">
+      <button type="button" id="knopf-eigene" class="knopf">
+        Eigene Analogziffern <span id="eigene-anzahl"></span>
+      </button>
+    </div>
+    <div id="eigene-bereich" class="block" hidden>
+      <h2>Eigene Analogziffern</h2>
+      <p class="block-hinweis">Nach § 6 Abs. 2 GOÄ können Leistungen, die im
+        Gebührenverzeichnis fehlen, entsprechend einer gleichwertigen Ziffer berechnet
+        werden. Punktzahl und Steigerungsklasse werden von ihr übernommen. Die Ziffern
+        bleiben auf diesem Gerät.</p>
+      <div id="eigene-liste" class="eigene-liste"></div>
+      <button type="button" id="knopf-eigene-neu" class="knopf haupt gross">Neue Analogziffer</button>
+    </div>
+
     <div class="suchleiste">
       <input type="search" id="feld-suche" placeholder="Ziffer oder Leistung suchen"
              autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
@@ -162,6 +177,30 @@
 </nav>
 
 <div id="hinweisfeld" class="hinweisfeld" role="status" aria-live="polite" hidden></div>
+
+<dialog id="analog-dialog" class="dialog">
+  <form method="dialog">
+    <h2>Neue Analogziffer</h2>
+    <label class="feld">
+      <span>Erbrachte Leistung</span>
+      <input type="text" id="analog-bezeichnung" placeholder="z. B. Stoßwellentherapie" autocomplete="off">
+    </label>
+    <label class="feld">
+      <span>Gleichwertige Ziffer des Verzeichnisses</span>
+      <input type="text" id="analog-vorlage" placeholder="z. B. 1800" autocomplete="off" inputmode="numeric">
+    </label>
+    <p id="analog-vorschau" class="block-hinweis"></p>
+    <label class="feld">
+      <span>Eigene Nummer</span>
+      <input type="text" id="analog-nummer" placeholder="A1800" autocomplete="off">
+    </label>
+    <p id="analog-fehler" class="meldung warnung" hidden></p>
+    <div class="knopfreihe">
+      <button type="submit" value="abbrechen" class="knopf">Abbrechen</button>
+      <button type="submit" value="ok" class="knopf haupt">Anlegen</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="dialog" class="dialog">
   <form method="dialog">

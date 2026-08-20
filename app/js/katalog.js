@@ -21,6 +21,8 @@ export class Katalog {
       ([nummer, bezeichnung, punktzahl, abschnitt, klasse, regelsatz, hoechstsatz, gruppe]) => ({
         nummer, bezeichnung, punktzahl, abschnitt, klasse, regelsatz, hoechstsatz,
         gruppe: gruppe === 1,
+        herkunft: gruppe === 1 ? 'gruppe' : 'eigen',
+        analogZu: '',
         klassenname: KLASSEN[klasse]?.name ?? klasse,
         // Kleingeschrieben vorhalten - die Suche laeuft ueber 2 711 Eintraege
         // und soll auf dem Telefon bei jedem Tastendruck fluessig bleiben.
@@ -47,11 +49,11 @@ export class Katalog {
     for (const l of this.leistungen) {
       if (worte.every((w) => l.suchtext.includes(w))) treffer.push(l);
     }
-    treffer.sort((a, b) => {
-      const genauA = a.nummer.toLowerCase() === text ? 0 : 1;
-      const genauB = b.nummer.toLowerCase() === text ? 0 : 1;
-      return genauA - genauB;
-    });
+    // Exakte Nummerntreffer zuerst, dann die eigenen Analogziffern - sie sind
+    // wenige und der Anwender sucht meist genau diese.
+    const rang = (l) => (l.nummer.toLowerCase() === text ? 0 : 1) * 2
+      + (l.herkunft === 'analog' ? 0 : 1);
+    treffer.sort((a, b) => rang(a) - rang(b));
     return { gesamt: treffer.length, liste: treffer.slice(0, grenze) };
   }
 }

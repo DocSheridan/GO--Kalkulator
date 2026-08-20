@@ -161,16 +161,51 @@ erhalten in der Position einen Hinweis. 425 der 2.711 Nummern sind so
 entstanden; 57 Zeilen ohne eindeutig zuzuordnende Punktzahl wurden nicht
 übernommen.
 
-### Eigene Ziffern
+### Eigene Analogziffern
 
-Analogziffern und Hausleistungen kommen in eine eigene CSV und werden
-eingespielt:
+Nach **§ 6 Abs. 2 GOÄ** dürfen Leistungen, die im Gebührenverzeichnis nicht
+aufgeführt sind, entsprechend einer nach Art, Kosten- und Zeitaufwand
+gleichwertigen Ziffer berechnet werden. Punktzahl und Steigerungsklasse
+ergeben sich dabei aus der herangezogenen Ziffer und sind deshalb nicht frei
+wählbar.
+
+```bash
+python3 kalkulator.py eigene neu "Stoßwellentherapie" 1800
+python3 kalkulator.py eigene neu "Akupunktur, 30 Minuten" 269 --nummer A-AKU
+python3 kalkulator.py eigene liste
+python3 kalkulator.py eigene loeschen A-AKU
+```
+
+Danach steht die Ziffer im Katalog wie jede andere und lässt sich in Angebote
+übernehmen:
+
+```bash
+python3 kalkulator.py neu "Privatleistung" -z 1 -z A1800 -z A-AKUx2
+```
+
+In der Oberfläche geht das über *Katalog → Eigene Analogziffern*, in der App
+über den Knopf *Eigene Analogziffern* im Katalogbereich.
+
+**Diese Ziffern gehören dem einzelnen Anwender.** Sie liegen als
+`eigene_ziffern.json` neben den Angeboten im persönlichen Ablageordner – im
+Programm also unter `~/GOÄ-Angebote`, in der App im Speicher des Geräts. Sie
+gehen weder in den mitgelieferten Katalog ein noch werden sie geteilt, und sie
+überstehen jede Aktualisierung des amtlichen Verzeichnisses.
+
+Auf der Rechnung wird die herangezogene Nummer mit ausgewiesen, wie es § 12
+Abs. 4 GOÄ verlangt: In der Spalte *Leistung* steht dann
+„Stoßwellentherapie, entsprechend Nr. 1800 GOÄ".
+
+### Fremde Kataloge einspielen
+
+Ein ganzer Ziffernsatz aus einer CSV-Datei kommt über den Katalogimport:
 
 ```bash
 python3 kalkulator.py katalog-import meine_ziffern.csv
 ```
 
-In der Oberfläche geht das über *Katalog → Ziffern aus CSV ergänzen*; mit
+Anders als die Analogziffern schreibt das in den mitgelieferten Katalog. In der
+Oberfläche geht es über *Katalog → Ziffern aus CSV ergänzen*; mit
 *Katalogdatei laden* lässt sich stattdessen ein ganz anderer Katalog verwenden.
 Den mitgelieferten Katalog erzeugt man jederzeit neu:
 

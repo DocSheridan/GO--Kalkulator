@@ -292,6 +292,25 @@ main { padding: 12px 12px 0; max-width: 760px; margin: 0 auto; }
 .suchleiste input[type="search"] { margin-bottom: 8px; }
 .such-einstellung { display: grid; grid-template-columns: 90px 1fr; gap: 10px; }
 
+.eigene-leiste { padding: 4px 0 8px; }
+.eigene-leiste .knopf { width: 100%; }
+.eigene-liste { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.eigene-eintrag {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--flaeche-2);
+  border: 1px solid var(--linie);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.eigene-eintrag .text { flex: 1; min-width: 0; }
+.eigene-eintrag .zeile2 { display: block; margin-top: 2px; font-size: .74rem; color: var(--text-leise); }
+.eigene-eintrag button {
+  flex: none; width: 34px; height: 34px;
+  border: none; border-radius: 8px; background: transparent;
+  color: var(--fehler); font-size: 1.15rem;
+}
+.analog-marke { color: var(--marke-stark); font-weight: 600; }
+
 .katalogliste { display: flex; flex-direction: column; gap: 8px; }
 .katalogeintrag {
   display: flex; align-items: center; gap: 10px;
@@ -345,6 +364,8 @@ main { padding: 12px 12px 0; max-width: 760px; margin: 0 auto; }
 .angebotskarte .knopf { font-size: .84rem; min-height: 38px; padding: 6px 10px; }
 
 /* -------------------------------------------------------- Summenleiste */
+.summenleiste[hidden] { display: none; }
+
 .summenleiste {
   position: fixed;
   left: 0; right: 0;

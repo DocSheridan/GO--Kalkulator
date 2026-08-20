@@ -6,6 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from .cli import Abbruch, angebot_tabelle, betrag, katalog_tabelle, position_aus
+from .eigene import EigeneFehler, EigeneZiffern, katalog_mit_eigenen
 from .excel import exportiere
 from .katalog import Katalog, KatalogFehler
 from .modelle import FAKTOR_SCHRITT, MAX_FAKTOR, MIN_FAKTOR, Angebot, faktor_text, geld
@@ -34,8 +35,11 @@ def kopf(titel: str) -> None:
 
 
 class Konsole:
-    def __init__(self, katalog: Katalog, verzeichnis: Angebotsverzeichnis):
-        self.katalog = katalog
+    def __init__(self, katalog: Katalog, verzeichnis: Angebotsverzeichnis,
+                 eigene: EigeneZiffern | None = None):
+        self.amtlich = katalog
+        self.eigene = eigene or EigeneZiffern(verzeichnis.pfad)
+        self.katalog = katalog_mit_eigenen(katalog, self.eigene)
         self.verzeichnis = verzeichnis
 
     # -- Hauptmenue -------------------------------------------------------
@@ -50,6 +54,7 @@ class Konsole:
             print("  3  Gespeicherte Angebote auflisten")
             print("  4  GOAE-Katalog durchsuchen")
             print("  5  Alle Angebote nach Excel exportieren")
+            print("  6  Eigene Analogziffern verwalten")
             print("  0  Beenden")
             wahl = input("\nAuswahl: ").strip()
             try:
@@ -63,6 +68,8 @@ class Konsole:
                     self.suche_katalog()
                 elif wahl == "5":
                     self.export_alle()
+                elif wahl == "6":
+                    self.eigene_ziffern()
                 elif wahl in ("0", "q", "ende"):
                     print("Auf Wiedersehen.")
                     return 0
@@ -82,6 +89,66 @@ class Konsole:
             print(katalog_tabelle(treffer, grenze=40))
         else:
             print("Keine passende Ziffer gefunden.")
+
+    # -- Eigene Analogziffern ---------------------------------------------
+    def eigene_ziffern(self) -> None:
+        while True:
+            ziffern = self.eigene.alle()
+            kopf(f"Eigene Analogziffern ({len(ziffern)})")
+            print("Nach § 6 Abs. 2 GOAE koennen nicht aufgefuehrte Leistungen entsprechend")
+            print("einer gleichwertigen Ziffer berechnet werden. Punktzahl und Steigerungs-")
+            print("klasse ergeben sich aus der herangezogenen Ziffer.")
+            print(f"\nAblage: {self.eigene.datei}  (nur auf diesem Geraet)\n")
+            if ziffern:
+                for i, l in enumerate(ziffern, start=1):
+                    print(f"  {i:>2}  {l.nummer:<10} {l.bezeichnung[:44]:<46} "
+                          f"analog {l.analog_zu:<6} {geld(l.satz_2_3):>9} EUR (2,3)")
+            else:
+                print("  (noch keine)")
+            print("\n  n  Neue Analogziffer   l  Loeschen   0  Zurueck")
+            wahl = input("\nAuswahl: ").strip().lower()
+            try:
+                if wahl == "n":
+                    self._eigene_anlegen()
+                elif wahl == "l":
+                    self._eigene_loeschen(ziffern)
+                elif wahl in ("0", "q", ""):
+                    return
+            except (Abbruch, EigeneFehler) as fehler:
+                print(f"\n! {fehler}")
+
+    def _eigene_anlegen(self) -> None:
+        bezeichnung = frage("Erbrachte Leistung")
+        if not bezeichnung:
+            return
+        print("Welche Ziffer des Verzeichnisses ist gleichwertig? ('?' sucht)")
+        while True:
+            vorlage = input("Herangezogene Ziffer: ").strip()
+            if not vorlage:
+                return
+            if vorlage.startswith("?"):
+                treffer = self.amtlich.suche(vorlage[1:].strip())
+                print(katalog_tabelle(treffer, grenze=20) if treffer else "Kein Treffer.")
+                continue
+            break
+        nummer = frage("Eigene Nummer", f"A{vorlage}")
+        leistung = self.eigene.anlegen(self.amtlich, bezeichnung, vorlage, nummer)
+        self.katalog = katalog_mit_eigenen(self.amtlich, self.eigene)
+        print(f"\nAngelegt: {leistung.nummer} - {leistung.punktzahl} Punkte, "
+              f"{geld(leistung.einfachsatz)} / {geld(leistung.satz_2_3)} / "
+              f"{geld(leistung.satz_3_5)} EUR")
+
+    def _eigene_loeschen(self, ziffern) -> None:
+        if not ziffern:
+            return
+        wahl = frage("Welche Nummer loeschen? (Zeilennummer oder Ziffer)")
+        if not wahl:
+            return
+        if wahl.isdigit() and 1 <= int(wahl) <= len(ziffern):
+            wahl = ziffern[int(wahl) - 1].nummer
+        entfernt = self.eigene.loeschen(wahl)
+        self.katalog = katalog_mit_eigenen(self.amtlich, self.eigene)
+        print(f"Geloescht: {entfernt.nummer}")
 
     # -- Angebote ---------------------------------------------------------
     def liste(self) -> None:
@@ -320,4 +387,5 @@ class Konsole:
 
 def starte(katalog_pfad: str | None = None, verzeichnis: str | None = None) -> int:
     katalog = Katalog.laden(katalog_pfad)
-    return Konsole(katalog, Angebotsverzeichnis(verzeichnis)).lauf()
+    ablage = Angebotsverzeichnis(verzeichnis)
+    return Konsole(katalog, ablage, EigeneZiffern(ablage.pfad)).lauf()

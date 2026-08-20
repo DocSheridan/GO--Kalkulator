@@ -5,14 +5,17 @@ import {
   betragAusText, faktorAusText, faktorText, geld,
 } from './modelle.js';
 import { Katalog } from './katalog.js';
+import { EigeneFehler, EigeneZiffern, katalogMitEigenen } from './eigene.js';
 import { Angebotsverzeichnis } from './speicher.js';
 import { STRATEGIEN, STRATEGIE_TEXT, optimiereFaktoren } from './zielbetrag.js';
 import { angebotAlsXlsx, dateiname } from './xlsx.js';
 
 const $ = (auswahl) => document.querySelector(auswahl);
 const verzeichnis = new Angebotsverzeichnis();
+const eigene = new EigeneZiffern();
 
-let katalog = null;
+let amtlich = null;   // das amtliche Verzeichnis
+let katalog = null;   // amtlich, ergänzt um die eigenen Analogziffern
 let angebot = new Angebot({ name: '' });
 let gesichert = true;
 let sucheGrenze = 40;
@@ -55,7 +58,9 @@ function wechsle(ziel) {
   document.querySelectorAll('.reiter-knopf').forEach((k) => {
     k.classList.toggle('aktiv', k.dataset.wechsel === ziel);
   });
-  $('#summenleiste').hidden = ziel !== 'angebot';
+  // Die Summe gehoert zum laufenden Angebot - im Katalog waechst sie beim
+  // Uebernehmen sichtbar mit, in der Ablage hat sie nichts zu suchen.
+  $('#summenleiste').hidden = ziel === 'gespeichert';
   if (ziel === 'gespeichert') zeigeGespeicherte();
   if (ziel === 'katalog') setTimeout(() => $('#feld-suche').focus(), 60);
   window.scrollTo({ top: 0 });
@@ -260,7 +265,10 @@ function zeichneKatalog() {
     knopf.innerHTML = `<span class="ziffer">${maskiere(l.nummer)}</span>`
       + `<span class="katalog-text"><span class="legende">${maskiere(l.bezeichnung)}</span>`
       + `<span class="katalog-saetze">${geld(betragFuer(l, 1000))} · ${geld(betragFuer(l, 2300))} · ${geld(betragFuer(l, 3500))} €`
-      + `  <span class="klasse">${l.abschnitt} / ${l.klassenname}${l.gruppe ? ' *' : ''}</span></span></span>`
+      + (l.herkunft === 'analog'
+        ? `  <span class="analog-marke">eigene Ziffer, analog ${maskiere(l.analogZu)}</span>`
+        : `  <span class="klasse">${l.abschnitt} / ${l.klassenname}${l.gruppe ? ' *' : ''}</span>`)
+      + '</span></span>'
       + '<span class="katalog-plus" aria-hidden="true">+</span>';
     knopf.setAttribute('aria-label', `Ziffer ${l.nummer} übernehmen`);
     knopf.addEventListener('click', () => uebernehmen(l));
@@ -279,6 +287,89 @@ function uebernehmen(leistung) {
   angebot.positionen.push(Position.ausLeistung(leistung, anzahl, faktor));
   geaendert();
   melde(`Ziffer ${leistung.nummer} übernommen · Summe ${geld(angebot.summe)} €`);
+}
+
+/* -------------------------------------------------- Eigene Analogziffern */
+
+function zeichneEigene() {
+  $('#eigene-anzahl').textContent = eigene.anzahl ? `(${eigene.anzahl})` : '';
+  const behaelter = $('#eigene-liste');
+  behaelter.textContent = '';
+  const alle = eigene.alle();
+  if (alle.length === 0) {
+    behaelter.innerHTML = '<p class="block-hinweis">Noch keine eigenen Ziffern angelegt.</p>';
+    return;
+  }
+  for (const l of alle) {
+    const zeile = document.createElement('div');
+    zeile.className = 'eigene-eintrag';
+    const betrag = new Position({ ...l, faktor: l.regelsatz }).betrag;
+    zeile.innerHTML = `<span class="text"><b>${maskiere(l.nummer)}</b> ${maskiere(l.bezeichnung)}`
+      + `<span class="zeile2">entsprechend Nr. ${maskiere(l.analogZu)} GOÄ · ${l.punktzahl} Punkte`
+      + ` · ${geld(betrag)} € beim ${faktorText(l.regelsatz)}-fachen Satz</span></span>`;
+    const weg = document.createElement('button');
+    weg.type = 'button';
+    weg.textContent = '×';
+    weg.setAttribute('aria-label', `Eigene Ziffer ${l.nummer} löschen`);
+    weg.addEventListener('click', async () => {
+      if (!await bestaetige('Löschen', `Eigene Ziffer „${l.nummer}“ entfernen?`)) return;
+      eigene.loeschen(l.nummer);
+      katalog = katalogMitEigenen(amtlich, eigene);
+      zeichneEigene();
+      zeichneKatalog();
+      melde(`${l.nummer} gelöscht`);
+    });
+    zeile.append(weg);
+    behaelter.append(zeile);
+  }
+}
+
+function analogAnlegen() {
+  const dialog = $('#analog-dialog');
+  const bezeichnung = $('#analog-bezeichnung');
+  const vorlage = $('#analog-vorlage');
+  const nummer = $('#analog-nummer');
+  const vorschau = $('#analog-vorschau');
+  const fehlerfeld = $('#analog-fehler');
+  bezeichnung.value = ''; vorlage.value = ''; nummer.value = '';
+  vorschau.textContent = ''; fehlerfeld.hidden = true;
+
+  // Waehrend der Eingabe zeigen, welche Ziffer herangezogen wird.
+  const pruefe = () => {
+    const wert = vorlage.value.trim();
+    if (!nummer.dataset.geaendert) nummer.value = wert ? `A${wert}` : '';
+    if (!wert) { vorschau.textContent = ''; return; }
+    try {
+      const l = amtlich.hole(wert);
+      vorschau.textContent = `${l.bezeichnung.slice(0, 80)} · ${l.punktzahl} Punkte · `
+        + `${geld(new Position({ ...l, faktor: l.regelsatz }).betrag)} € beim `
+        + `${faktorText(l.regelsatz)}-fachen Satz`;
+    } catch {
+      vorschau.textContent = 'Diese Ziffer steht nicht im Verzeichnis.';
+    }
+  };
+  vorlage.addEventListener('input', pruefe);
+  nummer.addEventListener('input', () => { nummer.dataset.geaendert = '1'; });
+  delete nummer.dataset.geaendert;
+
+  const beim = () => {
+    dialog.removeEventListener('close', beim);
+    vorlage.removeEventListener('input', pruefe);
+    if (dialog.returnValue !== 'ok') return;
+    try {
+      const l = eigene.anlegen(amtlich, bezeichnung.value, vorlage.value, nummer.value);
+      katalog = katalogMitEigenen(amtlich, eigene);
+      zeichneEigene();
+      $('#feld-suche').value = l.nummer;
+      zeichneKatalog();
+      melde(`${l.nummer} angelegt · ${geld(new Position({ ...l, faktor: l.regelsatz }).betrag)} €`);
+    } catch (fehler) {
+      if (!(fehler instanceof EigeneFehler)) throw fehler;
+      melde(fehler.message, 5000);
+    }
+  };
+  dialog.addEventListener('close', beim);
+  dialog.showModal();
 }
 
 /* -------------------------------------------------------------- Zielbetrag */
@@ -468,6 +559,12 @@ function verdrahte() {
     uhr = setTimeout(zeichneKatalog, 120);
   });
   $('#knopf-mehr').addEventListener('click', () => { sucheGrenze += 60; zeichneKatalog(); });
+  $('#knopf-eigene').addEventListener('click', () => {
+    const bereich = $('#eigene-bereich');
+    bereich.hidden = !bereich.hidden;
+    if (!bereich.hidden) zeichneEigene();
+  });
+  $('#knopf-eigene-neu').addEventListener('click', analogAnlegen);
 
   window.addEventListener('beforeunload', (e) => {
     if (!gesichert && angebot.positionen.length) { e.preventDefault(); e.returnValue = ''; }
@@ -489,13 +586,15 @@ function zeigeHilfe() {
 async function starte() {
   verdrahte();
   try {
-    katalog = await Katalog.laden();
+    amtlich = await Katalog.laden();
+    katalog = katalogMitEigenen(amtlich, eigene);
   } catch (fehler) {
     $('#kopf-unterzeile').textContent = 'Katalog konnte nicht geladen werden';
     melde('Der Leistungskatalog konnte nicht geladen werden.', 6000);
     return;
   }
   zeichneKatalog();
+  zeichneEigene();
   fuelleFelder();
   geaendert({ sichern: true });
   wechsle('angebot');

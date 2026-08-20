@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from goae_kalkulator import farben
 from goae_kalkulator.cli import betrag, main, zerlege_ziffer, Abbruch
+from goae_kalkulator.eigene import EigeneFehler, EigeneZiffern, katalog_mit_eigenen
 from goae_kalkulator.excel import exportiere
 from goae_kalkulator.katalog import Katalog, KatalogFehler
 from goae_kalkulator.modelle import (
@@ -504,6 +505,110 @@ class TestExcel(unittest.TestCase):
         self.assertNotIn("[", workbook.split('name="')[1].split('"')[0])
 
 
+class TestEigeneZiffern(unittest.TestCase):
+    """Analogziffern nach § 6 Abs. 2 GOAE - nur auf dem Geraet des Anwenders."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.katalog = Katalog.laden()
+
+    def setUp(self):
+        self.ordner = tempfile.TemporaryDirectory()
+        self.eigene = EigeneZiffern(self.ordner.name)
+
+    def tearDown(self):
+        self.ordner.cleanup()
+
+    def test_anlegen_uebernimmt_die_werte_der_vorlage(self):
+        vorlage = self.katalog.hole("1800")
+        neu = self.eigene.anlegen(self.katalog, "Stosswellentherapie", "1800")
+        self.assertEqual(neu.nummer, "A1800")
+        self.assertEqual(neu.analog_zu, "1800")
+        self.assertEqual(neu.punktzahl, vorlage.punktzahl)
+        self.assertEqual(neu.klasse, vorlage.klasse)
+        self.assertEqual(neu.regelsatz, vorlage.regelsatz)
+        self.assertEqual(neu.hoechstsatz, vorlage.hoechstsatz)
+        self.assertEqual(neu.satz_2_3, vorlage.satz_2_3)
+        self.assertEqual(neu.herkunft, "analog")
+
+    def test_eigene_nummer(self):
+        neu = self.eigene.anlegen(self.katalog, "Akupunktur", "269", nummer="A-AKU")
+        self.assertEqual(neu.nummer, "A-AKU")
+
+    def test_die_ablage_ueberdauert_einen_neustart(self):
+        self.eigene.anlegen(self.katalog, "Stosswellentherapie", "1800")
+        wieder = EigeneZiffern(self.ordner.name)
+        self.assertEqual(len(wieder), 1)
+        self.assertEqual(wieder.hole("A1800").bezeichnung, "Stosswellentherapie")
+
+    def test_abgelehnte_eingaben(self):
+        self.eigene.anlegen(self.katalog, "Erste", "1800")
+        for text, vorlage, nummer in [
+            ("", "1800", None),                    # ohne Bezeichnung
+            ("Zweite", "99999", None),             # Vorlage gibt es nicht
+            ("Zweite", "1800", None),              # Nummer schon vergeben (eigene)
+            ("Zweite", "1800", "1"),               # Nummer amtlich vergeben
+            ("Zweite", "1800", "A/B;C"),           # unzulaessige Zeichen
+            ("Zweite", "1800", "A" * 20),          # zu lang
+        ]:
+            with self.assertRaises(EigeneFehler, msg=f"{text!r}/{vorlage}/{nummer}"):
+                self.eigene.anlegen(self.katalog, text, vorlage, nummer=nummer)
+
+    def test_loeschen(self):
+        self.eigene.anlegen(self.katalog, "Stosswellentherapie", "1800")
+        self.eigene.loeschen("a1800")            # Gross-/Kleinschreibung egal
+        self.assertEqual(len(self.eigene), 0)
+        with self.assertRaises(EigeneFehler):
+            self.eigene.loeschen("A1800")
+
+    def test_ueberlagerung_laesst_den_amtlichen_katalog_unberuehrt(self):
+        self.eigene.anlegen(self.katalog, "Stosswellentherapie", "1800")
+        vorher = len(self.katalog)
+        zusammen = katalog_mit_eigenen(self.katalog, self.eigene)
+        self.assertEqual(len(zusammen), vorher + 1)
+        self.assertEqual(len(self.katalog), vorher, "der amtliche Katalog wurde veraendert")
+        self.assertNotIn("A1800", self.katalog)
+        self.assertIn("A1800", zusammen)
+
+    def test_eigene_ziffern_stehen_in_der_suche_vorn(self):
+        self.eigene.anlegen(self.katalog, "Stosswellentherapie", "1800")
+        zusammen = katalog_mit_eigenen(self.katalog, self.eigene)
+        treffer = zusammen.suche("stosswellen")
+        self.assertEqual(treffer[0].nummer, "A1800")
+
+    def test_rechnungsvermerk_nach_paragraf_12(self):
+        neu = self.eigene.anlegen(self.katalog, "Stosswellentherapie", "1800")
+        position = Position.aus_leistung(neu)
+        self.assertEqual(position.analogvermerk, "entsprechend Nr. 1800 GOAE")
+        self.assertEqual(position.leistungstext,
+                         "Stosswellentherapie, entsprechend Nr. 1800 GOAE")
+
+    def test_analogziffer_uebersteht_das_speichern_eines_angebots(self):
+        neu = self.eigene.anlegen(self.katalog, "Stosswellentherapie", "1800")
+        angebot = Angebot(name="Privat")
+        angebot.hinzufuegen(Position.aus_leistung(neu))
+        kopie = Angebot.from_dict(angebot.to_dict())
+        self.assertEqual(kopie.positionen[0].analog_zu, "1800")
+        self.assertEqual(kopie.positionen[0].leistungstext, angebot.positionen[0].leistungstext)
+
+    def test_datei_der_eigenen_ziffern_stoert_die_angebotsliste_nicht(self):
+        verzeichnis = Angebotsverzeichnis(self.ordner.name)
+        angebot = Angebot(name="Ein Angebot")
+        angebot.hinzufuegen(Position.aus_leistung(self.katalog.hole("1")))
+        verzeichnis.speichern(angebot)
+        self.eigene.anlegen(self.katalog, "Stosswellentherapie", "1800")
+        self.assertEqual(verzeichnis.namen(), ["Ein Angebot"])
+
+    def test_excel_traegt_den_analogvermerk(self):
+        neu = self.eigene.anlegen(self.katalog, "Stosswellentherapie", "1800")
+        angebot = Angebot(name="Privat")
+        angebot.hinzufuegen(Position.aus_leistung(neu))
+        pfad = exportiere(angebot, Path(self.ordner.name) / "analog.xlsx")
+        with zipfile.ZipFile(pfad) as archiv:
+            blatt = archiv.read("xl/worksheets/sheet1.xml").decode()
+        self.assertIn("entsprechend Nr. 1800 GOAE", blatt)
+
+
 class TestFarbschema(unittest.TestCase):
     """Ein Farbschema, drei Fassungen - sie duerfen nicht auseinanderlaufen."""
 
@@ -579,7 +684,11 @@ class TestKommandozeile(unittest.TestCase):
         self.assertEqual(zerlege_ziffer("3x2"), ("3", 2, None))
         self.assertEqual(zerlege_ziffer("410x2@2,5"), ("410", 2, Decimal("2.5")))
         self.assertEqual(zerlege_ziffer(" A619 "), ("A619", 1, None))
-        for falsch in ("", "abc", "3@9", "3@0,5"):
+        # Frei benannte Analogziffern
+        self.assertEqual(zerlege_ziffer("A-AKU"), ("A-AKU", 1, None))
+        self.assertEqual(zerlege_ziffer("A-AKUx2@2,5"), ("A-AKU", 2, Decimal("2.5")))
+        self.assertEqual(zerlege_ziffer("K 2"), ("K 2", 1, None))
+        for falsch in ("", "A/B;C", "3@9", "3@0,5", "3@viel"):
             with self.assertRaises(Abbruch, msg=falsch):
                 zerlege_ziffer(falsch)
 

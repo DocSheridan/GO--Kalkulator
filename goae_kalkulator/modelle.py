@@ -77,9 +77,12 @@ class Leistung:
     klasse: str = "aerztlich"
     regelsatz: Decimal = Decimal("2.3")
     hoechstsatz: Decimal = Decimal("3.5")
-    # "eigen" = Punktzahl steht bei dieser Nummer, "gruppe" = sie gilt im
-    # Verzeichnis fuer eine Gruppe von Nummern (verbundene Zelle).
+    # "eigen"  = Punktzahl steht bei dieser Nummer
+    # "gruppe" = sie gilt im Verzeichnis fuer eine Gruppe von Nummern
+    # "analog" = eigene Ziffer nach § 6 Abs. 2 GOAE
     herkunft: str = "eigen"
+    # Bei Analogziffern die herangezogene Nummer des Gebuehrenverzeichnisses.
+    analog_zu: str = ""
 
     @property
     def einfachsatz(self) -> Decimal:
@@ -113,6 +116,7 @@ class Position:
     hoechstsatz: Decimal = Decimal("3.5")
     begruendung: str = ""
     herkunft: str = "eigen"
+    analog_zu: str = ""
 
     def __post_init__(self) -> None:
         self.faktor = faktor(self.faktor)
@@ -164,6 +168,17 @@ class Position:
         """Faktor oberhalb des Hoechstsatzes der Steigerungsklasse."""
         return self.faktor > self.hoechstsatz
 
+    @property
+    def analogvermerk(self) -> str:
+        """Kennzeichnung nach § 12 Abs. 4 GOAE - gehoert auf jede Rechnung."""
+        return f"entsprechend Nr. {self.analog_zu} GOAE" if self.analog_zu else ""
+
+    @property
+    def leistungstext(self) -> str:
+        """Bezeichnung, bei Analogziffern mit der herangezogenen Nummer."""
+        vermerk = self.analogvermerk
+        return f"{self.bezeichnung}, {vermerk}" if vermerk else self.bezeichnung
+
     def hinweis(self) -> str:
         if self.ueber_hoechstsatz:
             return f"Faktor > Hoechstsatz {faktor_text(self.hoechstsatz)} ({self.klasse})"
@@ -188,6 +203,7 @@ class Position:
             "hoechstsatz": str(self.hoechstsatz),
             "begruendung": self.begruendung,
             "herkunft": self.herkunft,
+            "analog_zu": self.analog_zu,
         }
 
     @classmethod
@@ -205,6 +221,7 @@ class Position:
             hoechstsatz=Decimal(str(daten.get("hoechstsatz", "3.5"))),
             begruendung=daten.get("begruendung", ""),
             herkunft=daten.get("herkunft", "eigen"),
+            analog_zu=daten.get("analog_zu", ""),
         )
 
     @classmethod
@@ -222,6 +239,7 @@ class Position:
             regelsatz=leistung.regelsatz,
             hoechstsatz=leistung.hoechstsatz,
             herkunft=leistung.herkunft,
+            analog_zu=leistung.analog_zu,
         )
 
 

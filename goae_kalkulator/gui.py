@@ -14,6 +14,7 @@ except ImportError:  # pragma: no cover - nur ohne installiertes tkinter
 
 from . import farben
 from .cli import betrag
+from .eigene import EigeneFehler, EigeneZiffern, katalog_mit_eigenen
 from .excel import exportiere
 from .katalog import Katalog, KatalogFehler
 from .modelle import (
@@ -55,9 +56,12 @@ POSITION_SPALTEN = (
 class Anwendung(tk.Tk):
     """Hauptfenster: Katalog links, Angebot rechts, Kalkulation unten."""
 
-    def __init__(self, katalog: Katalog, verzeichnis: Angebotsverzeichnis):
+    def __init__(self, katalog: Katalog, verzeichnis: Angebotsverzeichnis,
+                 eigene: EigeneZiffern | None = None):
         super().__init__()
-        self.katalog = katalog
+        self.amtlich = katalog
+        self.eigene = eigene or EigeneZiffern(verzeichnis.pfad)
+        self.katalog = katalog_mit_eigenen(katalog, self.eigene)
         self.verzeichnis = verzeichnis
         self.angebot = Angebot(name="Neues Angebot")
         self.veraendert = False
@@ -106,6 +110,8 @@ class Anwendung(tk.Tk):
         leiste.add_cascade(label="Datei", menu=datei)
 
         katalog = tk.Menu(leiste, tearoff=0)
+        katalog.add_command(label="Eigene Analogziffern...", command=self.eigene_verwalten)
+        katalog.add_separator()
         katalog.add_command(label="Katalogdatei laden...", command=self.katalog_laden)
         katalog.add_command(label="Ziffern aus CSV ergaenzen...", command=self.katalog_ergaenzen)
         leiste.add_cascade(label="Katalog", menu=katalog)
@@ -331,7 +337,8 @@ class Anwendung(tk.Tk):
                 values=(leistung.nummer, leistung.bezeichnung, leistung.punktzahl,
                         geld(leistung.einfachsatz), geld(leistung.satz_2_3),
                         geld(leistung.satz_3_5),
-                        f"{leistung.abschnitt} / {leistung.klasse}"
+                        f"analog {leistung.analog_zu}" if leistung.herkunft == "analog"
+                        else f"{leistung.abschnitt} / {leistung.klasse}"
                         + (" *" if leistung.herkunft == "gruppe" else "")),
             )
 
@@ -733,10 +740,11 @@ class Anwendung(tk.Tk):
         if not pfad:
             return
         try:
-            self.katalog = Katalog.laden(pfad)
+            self.amtlich = Katalog.laden(pfad)
         except KatalogFehler as fehler:
             messagebox.showerror("Katalog nicht lesbar", str(fehler), parent=self)
             return
+        self.katalog = katalog_mit_eigenen(self.amtlich, self.eigene)
         self._fuelle_katalog()
         self._melde(f"Katalog geladen: {len(self.katalog)} Ziffern aus {pfad}")
 
@@ -746,12 +754,21 @@ class Anwendung(tk.Tk):
         if not pfad:
             return
         try:
-            self.katalog.ergaenzen(Katalog.laden(pfad))
+            self.amtlich.ergaenzen(Katalog.laden(pfad))
         except KatalogFehler as fehler:
             messagebox.showerror("Katalog nicht lesbar", str(fehler), parent=self)
             return
+        self.katalog = katalog_mit_eigenen(self.amtlich, self.eigene)
         self._fuelle_katalog()
         self._melde(f"Katalog ergaenzt: jetzt {len(self.katalog)} Ziffern.")
+
+    def eigene_verwalten(self) -> None:
+        Eigenenfenster(self)
+
+    def katalog_neu_aufbauen(self) -> None:
+        """Nach Aenderungen an den eigenen Ziffern die Anzeige auffrischen."""
+        self.katalog = katalog_mit_eigenen(self.amtlich, self.eigene)
+        self._fuelle_katalog()
 
     def hilfe(self) -> None:
         messagebox.showinfo(
@@ -851,6 +868,94 @@ class Auswahlfenster(tk.Toplevel):
         self.eltern.oeffnen()
 
 
+class Eigenenfenster(tk.Toplevel):
+    """Verwaltung der eigenen Analogziffern nach § 6 Abs. 2 GOAE."""
+
+    def __init__(self, eltern: Anwendung):
+        super().__init__(eltern)
+        self.eltern = eltern
+        self.title("Eigene Analogziffern")
+        self.geometry("880x480")
+        self.transient(eltern)
+        self.grab_set()
+
+        ttk.Label(self, justify="left", text=(
+            "Nach § 6 Abs. 2 GOÄ können Leistungen, die im Gebührenverzeichnis fehlen,\n"
+            "entsprechend einer gleichwertigen Ziffer berechnet werden. Punktzahl und\n"
+            "Steigerungsklasse ergeben sich aus der herangezogenen Ziffer.")
+        ).pack(anchor="w", padx=10, pady=(10, 4))
+        ttk.Label(self, foreground=farben.GRAU,
+                  text=f"Ablage (nur auf diesem Gerät): {eltern.eigene.datei}"
+                  ).pack(anchor="w", padx=10)
+
+        spalten = ("nummer", "bezeichnung", "analog", "punkte", "e23", "klasse")
+        titel = ("Nummer", "Leistung", "analog zu", "Punkte", "2,3-fach", "Klasse")
+        breiten = (90, 300, 90, 70, 90, 100)
+        self.baum = ttk.Treeview(self, columns=spalten, show="headings", selectmode="browse")
+        for s, ti, b in zip(spalten, titel, breiten):
+            self.baum.heading(s, text=ti)
+            self.baum.column(s, width=b, anchor="e" if s in ("punkte", "e23") else "w",
+                             stretch=(s == "bezeichnung"))
+        self.baum.pack(fill="both", expand=True, padx=10, pady=8)
+
+        leiste = ttk.Frame(self)
+        leiste.pack(fill="x", padx=10, pady=(0, 10))
+        ttk.Button(leiste, text="Neue Analogziffer", command=self.anlegen).pack(side="left", padx=2)
+        ttk.Button(leiste, text="Löschen", command=self.loeschen).pack(side="left", padx=2)
+        ttk.Button(leiste, text="Schließen", command=self.destroy).pack(side="right", padx=2)
+        self.fuellen()
+
+    def fuellen(self) -> None:
+        self.baum.delete(*self.baum.get_children())
+        for l in self.eltern.eigene.alle():
+            self.baum.insert("", "end", iid=l.nummer, values=(
+                l.nummer, l.bezeichnung, l.analog_zu, l.punktzahl,
+                f"{geld(l.satz_2_3)} EUR", l.klasse))
+
+    def anlegen(self) -> None:
+        from tkinter import simpledialog
+        bezeichnung = simpledialog.askstring(
+            "Neue Analogziffer", "Welche Leistung wurde erbracht?", parent=self)
+        if not bezeichnung or not bezeichnung.strip():
+            return
+        vorlage = simpledialog.askstring(
+            "Neue Analogziffer",
+            "Welche Ziffer des Gebührenverzeichnisses ist gleichwertig?\n"
+            "(Punktzahl und Steigerungsklasse werden von ihr übernommen)", parent=self)
+        if not vorlage or not vorlage.strip():
+            return
+        nummer = simpledialog.askstring(
+            "Neue Analogziffer", "Unter welcher eigenen Nummer soll sie geführt werden?",
+            initialvalue=f"A{vorlage.strip()}", parent=self)
+        if not nummer:
+            return
+        try:
+            leistung = self.eltern.eigene.anlegen(
+                self.eltern.amtlich, bezeichnung, vorlage.strip(), nummer.strip())
+        except EigeneFehler as fehler:
+            messagebox.showerror("Nicht angelegt", str(fehler), parent=self)
+            return
+        self.fuellen()
+        self.eltern.katalog_neu_aufbauen()
+        self.eltern._melde(f"Analogziffer {leistung.nummer} angelegt "
+                           f"({geld(leistung.satz_2_3)} EUR beim 2,3-fachen Satz).")
+
+    def loeschen(self) -> None:
+        auswahl = self.baum.selection()
+        if not auswahl:
+            return
+        if not messagebox.askyesno("Löschen",
+                                   f"Eigene Ziffer {auswahl[0]!r} entfernen?", parent=self):
+            return
+        try:
+            self.eltern.eigene.loeschen(auswahl[0])
+        except EigeneFehler as fehler:
+            messagebox.showerror("Nicht gelöscht", str(fehler), parent=self)
+            return
+        self.fuellen()
+        self.eltern.katalog_neu_aufbauen()
+
+
 def starte(katalog_pfad: str | None = None, verzeichnis: str | None = None) -> int:
     if tk is None:
         print(
@@ -863,5 +968,6 @@ def starte(katalog_pfad: str | None = None, verzeichnis: str | None = None) -> i
         )
         return 3
     katalog = Katalog.laden(katalog_pfad)
-    Anwendung(katalog, Angebotsverzeichnis(verzeichnis)).mainloop()
+    ablage = Angebotsverzeichnis(verzeichnis)
+    Anwendung(katalog, ablage, EigeneZiffern(ablage.pfad)).mainloop()
     return 0

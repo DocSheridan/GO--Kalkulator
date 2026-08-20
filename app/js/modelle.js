@@ -85,6 +85,9 @@ export class Position {
     this.hoechstsatz = daten.hoechstsatz ?? 3500;
     this.begruendung = daten.begruendung ?? '';
     this.gruppe = daten.gruppe ?? false;
+    this.herkunft = daten.herkunft ?? 'eigen';
+    // Bei Analogziffern die herangezogene Nummer des Gebührenverzeichnisses.
+    this.analogZu = daten.analogZu ?? '';
   }
 
   static ausLeistung(leistung, anzahl = 1, faktor = null) {
@@ -99,6 +102,8 @@ export class Position {
       regelsatz: leistung.regelsatz,
       hoechstsatz: leistung.hoechstsatz,
       gruppe: leistung.gruppe,
+      herkunft: leistung.herkunft,
+      analogZu: leistung.analogZu,
     });
   }
 
@@ -113,6 +118,16 @@ export class Position {
 
   get ueberRegelsatz() { return this.faktor > this.regelsatz; }
   get ueberHoechstsatz() { return this.faktor > this.hoechstsatz; }
+
+  /** Kennzeichnung nach § 12 Abs. 4 GOÄ – gehört auf jede Rechnung. */
+  get analogvermerk() {
+    return this.analogZu ? `entsprechend Nr. ${this.analogZu} GOÄ` : '';
+  }
+
+  /** Bezeichnung, bei Analogziffern mit der herangezogenen Nummer. */
+  get leistungstext() {
+    return this.analogvermerk ? `${this.bezeichnung}, ${this.analogvermerk}` : this.bezeichnung;
+  }
 
   hinweis() {
     if (this.ueberHoechstsatz) {
@@ -133,6 +148,7 @@ export class Position {
       anzahl: this.anzahl, faktor: this.faktor, fixiert: this.fixiert,
       abschnitt: this.abschnitt, klasse: this.klasse, regelsatz: this.regelsatz,
       hoechstsatz: this.hoechstsatz, begruendung: this.begruendung, gruppe: this.gruppe,
+      herkunft: this.herkunft, analogZu: this.analogZu,
     };
   }
 }

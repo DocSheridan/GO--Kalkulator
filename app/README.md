@@ -71,6 +71,22 @@ Die Leiste über den Reitern zeigt durchgehend die vier Summen.
 Zeilen mit einem Faktor über dem Regelsatz sind orange markiert (Begründung
 nach § 12 GOÄ nötig), über dem Höchstsatz der Steigerungsklasse rot.
 
+## Eigene Analogziffern
+
+Nach § 6 Abs. 2 GOÄ dürfen Leistungen, die im Gebührenverzeichnis fehlen,
+entsprechend einer gleichwertigen Ziffer berechnet werden. Im Katalogbereich
+legt der Knopf *Eigene Analogziffern* eine solche an: Sie geben die erbrachte
+Leistung an und die Ziffer, die herangezogen wird – Punktzahl und
+Steigerungsklasse werden von ihr übernommen und live angezeigt.
+
+Die Ziffer steht danach im Katalog wie jede andere, erscheint in der Suche
+ganz oben und ist als eigene gekennzeichnet. Auf der Excel-Rechnung wird die
+herangezogene Nummer ausgewiesen, wie es § 12 Abs. 4 GOÄ verlangt.
+
+**Diese Ziffern bleiben auf dem Gerät.** Sie liegen im Speicher des Browsers,
+werden nicht übertragen und nicht geteilt – wie die Angebote auch. Wer sie auf
+mehreren Geräten braucht, legt sie dort erneut an.
+
 ## Excel weitergeben
 
 *Excel* erzeugt die `.xlsx`-Datei auf dem Gerät und öffnet das

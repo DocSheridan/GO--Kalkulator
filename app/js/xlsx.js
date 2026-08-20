@@ -171,7 +171,7 @@ export function angebotAlsXlsx(angebot) {
   ];
   for (const p of angebot.positionen) {
     zeilen.push([
-      { wert: p.nummer }, { wert: p.bezeichnung },
+      { wert: p.nummer }, { wert: p.leistungstext },
       { wert: p.anzahl, stil: 'zahl' }, { wert: p.punktzahl * p.anzahl, stil: 'zahl' },
       { wert: e(p.einfachsatz), stil: 'euroHell' }, { wert: e(p.satz23), stil: 'euroHell' },
       { wert: e(p.satz35), stil: 'euroHell' },

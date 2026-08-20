@@ -5,13 +5,15 @@
  * Beim Aendern der Version wird der alte Bestand verworfen.
  */
 
-const VERSION = 'goae-v2';
+const VERSION = 'goae-v3';
 const BESTAND = [
   './',
   './index.html',
   './app.css',
   './manifest.webmanifest',
   './js/app.js',
+  './js/eigene.js',
+  './js/farben.js',
   './js/modelle.js',
   './js/katalog.js',
   './js/speicher.js',

@@ -10,6 +10,9 @@ from pathlib import Path
 
 from .modelle import Angebot
 
+# Dateien im Ablageordner, die keine Angebote sind.
+RESERVIERT = {"eigene_ziffern.json"}
+
 UMLAUTE = {
     "ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss",
     "Ä": "Ae", "Ö": "Oe", "Ü": "Ue",
@@ -48,9 +51,10 @@ class Angebotsverzeichnis:
 
     # -- Uebersicht -------------------------------------------------------
     def dateien(self) -> list[Path]:
+        """Alle Angebotsdateien - ohne die des Programms selbst."""
         if not self.pfad.exists():
             return []
-        return sorted(self.pfad.glob("*.json"))
+        return sorted(d for d in self.pfad.glob("*.json") if d.name not in RESERVIERT)
 
     def liste(self) -> list[dict]:
         """Kurzuebersicht aller gespeicherten Angebote."""
@@ -83,9 +87,11 @@ class Angebotsverzeichnis:
             daten = json.loads(datei.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as fehler:
             raise SpeicherFehler(f"{datei.name} kann nicht gelesen werden: {fehler}") from fehler
+        if not isinstance(daten, dict):
+            raise SpeicherFehler(f"{datei.name} enthaelt kein Angebot.")
         try:
             return Angebot.from_dict(daten)
-        except (KeyError, TypeError, ValueError) as fehler:
+        except (AttributeError, KeyError, TypeError, ValueError) as fehler:
             raise SpeicherFehler(f"{datei.name} hat ein unerwartetes Format: {fehler}") from fehler
 
     def finde_datei(self, name: str) -> Path | None:

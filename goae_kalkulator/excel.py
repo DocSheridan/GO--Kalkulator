@@ -248,7 +248,7 @@ def angebot_blatt(angebot: Angebot, name: str | None = None) -> Blatt:
     for p in angebot.positionen:
         z.append([
             Zelle(p.nummer),
-            Zelle(p.bezeichnung),
+            Zelle(p.leistungstext),
             Zelle(p.anzahl, "zahl"),
             Zelle(p.punktzahl * p.anzahl, "zahl"),
             Zelle(_f(p.einfachsatz), "euro_hell"),

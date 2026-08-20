@@ -92,6 +92,7 @@ class Katalog:
                     regelsatz=_dezimal(daten.get("regelsatz", ""), str(regel_std)),
                     hoechstsatz=_dezimal(daten.get("hoechstsatz", ""), str(hoechst_std)),
                     herkunft=(daten.get("herkunft") or "eigen").lower(),
+                    analog_zu=daten.get("analog_zu", ""),
                 )
             )
         if not leistungen:
@@ -127,8 +128,11 @@ class Katalog:
             for l in self.alle()
             if text in l.nummer.lower() or text in l.bezeichnung.lower()
         ]
-        # Exakte Nummerntreffer nach vorn.
-        treffer.sort(key=lambda l: (l.nummer.lower() != text, _sortierschluessel(l)))
+        # Exakte Nummerntreffer zuerst, dann die eigenen Analogziffern - sie
+        # sind wenige und der Anwender sucht meist genau diese.
+        treffer.sort(key=lambda l: (l.nummer.lower() != text,
+                                    l.herkunft != "analog",
+                                    _sortierschluessel(l)))
         return treffer
 
     def ergaenzen(self, andere: "Katalog") -> None:

@@ -9,6 +9,7 @@ import {
 import { Katalog } from '../js/katalog.js';
 import { Angebotsverzeichnis } from '../js/speicher.js';
 import { optimiereFaktoren } from '../js/zielbetrag.js';
+import { EigeneFehler, EigeneZiffern, katalogMitEigenen } from '../js/eigene.js';
 import { angebotAlsXlsx, dateiname } from '../js/xlsx.js';
 
 const wurzel = new URL('..', import.meta.url).pathname;
@@ -193,4 +194,99 @@ test('Excel-Datei ist ein gültiges ZIP mit den erwarteten Teilen', async () => 
   }
   assert.ok(text.includes('&amp;'), 'Sonderzeichen maskiert');
   assert.equal(dateiname('Vorsorge für Männer / 2026'), 'Vorsorge_fuer_Maenner_2026.xlsx');
+});
+
+/* ------------------------------------------------- Eigene Analogziffern */
+
+/** Ablage im Arbeitsspeicher - ersetzt localStorage in den Testfällen. */
+function ablage() {
+  const inhalt = new Map();
+  return { getItem: (k) => inhalt.get(k) ?? null, setItem: (k, v) => inhalt.set(k, v) };
+}
+
+test('Analogziffer übernimmt die Werte der herangezogenen Ziffer', () => {
+  const eigene = new EigeneZiffern(ablage());
+  const vorlage = katalog.hole('1800');
+  const neu = eigene.anlegen(katalog, 'Stoßwellentherapie', '1800');
+  assert.equal(neu.nummer, 'A1800');
+  assert.equal(neu.analogZu, '1800');
+  assert.equal(neu.punktzahl, vorlage.punktzahl);
+  assert.equal(neu.klasse, vorlage.klasse);
+  assert.equal(neu.regelsatz, vorlage.regelsatz);
+  assert.equal(neu.herkunft, 'analog');
+});
+
+test('eigene Nummer und Bereinigung der Bezeichnung', () => {
+  const eigene = new EigeneZiffern(ablage());
+  const neu = eigene.anlegen(katalog, '  Akupunktur,   30 Minuten ', '269', 'A-AKU');
+  assert.equal(neu.nummer, 'A-AKU');
+  assert.equal(neu.bezeichnung, 'Akupunktur, 30 Minuten');
+});
+
+test('abgelehnte Eingaben', () => {
+  const eigene = new EigeneZiffern(ablage());
+  eigene.anlegen(katalog, 'Erste', '1800');
+  for (const [text, vorlage, nummer] of [
+    ['', '1800', ''], ['Zweite', '99999', ''], ['Zweite', '1800', ''],
+    ['Zweite', '1800', '1'], ['Zweite', '1800', 'A/B;C'], ['Zweite', '1800', 'A'.repeat(20)],
+  ]) {
+    assert.throws(() => eigene.anlegen(katalog, text, vorlage, nummer), EigeneFehler,
+      `${text}/${vorlage}/${nummer}`);
+  }
+});
+
+test('löschen, unabhängig von Groß- und Kleinschreibung', () => {
+  const eigene = new EigeneZiffern(ablage());
+  eigene.anlegen(katalog, 'Stoßwellentherapie', '1800');
+  eigene.loeschen('a1800');
+  assert.equal(eigene.anzahl, 0);
+  assert.throws(() => eigene.loeschen('A1800'), EigeneFehler);
+});
+
+test('Überlagerung lässt den amtlichen Katalog unberührt', () => {
+  const eigene = new EigeneZiffern(ablage());
+  eigene.anlegen(katalog, 'Stoßwellentherapie', '1800');
+  const vorher = katalog.anzahl;
+  const zusammen = katalogMitEigenen(katalog, eigene);
+  assert.equal(zusammen.anzahl, vorher + 1);
+  assert.equal(katalog.anzahl, vorher, 'der amtliche Katalog wurde verändert');
+  assert.throws(() => katalog.hole('A1800'));
+  assert.equal(zusammen.hole('A1800').analogZu, '1800');
+});
+
+test('eigene Ziffern stehen in der Suche vorn', () => {
+  const eigene = new EigeneZiffern(ablage());
+  eigene.anlegen(katalog, 'Stoßwellentherapie', '1800');
+  const zusammen = katalogMitEigenen(katalog, eigene);
+  assert.equal(zusammen.suche('stoßwellen').liste[0].nummer, 'A1800');
+});
+
+test('Rechnungsvermerk nach § 12 Abs. 4 GOÄ', () => {
+  const eigene = new EigeneZiffern(ablage());
+  const neu = eigene.anlegen(katalog, 'Stoßwellentherapie', '1800');
+  const p = Position.ausLeistung(neu);
+  assert.equal(p.analogvermerk, 'entsprechend Nr. 1800 GOÄ');
+  assert.equal(p.leistungstext, 'Stoßwellentherapie, entsprechend Nr. 1800 GOÄ');
+  const ohne = Position.ausLeistung(katalog.hole('1'));
+  assert.equal(ohne.analogvermerk, '');
+  assert.equal(ohne.leistungstext, ohne.bezeichnung);
+});
+
+test('Analogziffer übersteht das Speichern eines Angebots', () => {
+  const eigene = new EigeneZiffern(ablage());
+  const neu = eigene.anlegen(katalog, 'Stoßwellentherapie', '1800');
+  const a = new Angebot({ name: 'Privat' });
+  a.positionen.push(Position.ausLeistung(neu));
+  const kopie = new Angebot(JSON.parse(JSON.stringify(a.toJSON())));
+  assert.equal(kopie.positionen[0].analogZu, '1800');
+  assert.equal(kopie.positionen[0].leistungstext, a.positionen[0].leistungstext);
+});
+
+test('Excel trägt den Analogvermerk', async () => {
+  const eigene = new EigeneZiffern(ablage());
+  const neu = eigene.anlegen(katalog, 'Stoßwellentherapie', '1800');
+  const a = new Angebot({ name: 'Privat' });
+  a.positionen.push(Position.ausLeistung(neu));
+  const puffer = Buffer.from(await angebotAlsXlsx(a).arrayBuffer());
+  assert.ok(puffer.toString('utf8').includes('entsprechend Nr. 1800 GO'));
 });
