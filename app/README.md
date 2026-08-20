@@ -25,6 +25,12 @@ GitHub Pages nur `/` oder `/docs` als Quellordner anbietet – `app/` lässt sic
 so nicht veröffentlichen, und die Dateien sollten nicht doppelt im Repository
 liegen.
 
+Einmalig war dafür unter *Settings → Pages → Build and deployment* als **Source**
+„GitHub Actions" einzustellen. Diesen Schritt kann der Arbeitsablauf nicht selbst
+erledigen: Sein Token darf veröffentlichen, aber die Pages-Seite nicht erstmalig
+anlegen. Wird das Repository einmal geforkt oder neu aufgesetzt, ist der Schritt
+zu wiederholen.
+
 Wird der Branch später umbenannt oder nach `main` überführt, ist der
 Branch-Name oben in `pages.yml` anzupassen.
 
