@@ -2,6 +2,7 @@
 
 import contextlib
 import io
+import re
 import sys
 import tempfile
 import unittest
@@ -11,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from goae_kalkulator import farben
 from goae_kalkulator.cli import betrag, main, zerlege_ziffer, Abbruch
 from goae_kalkulator.excel import exportiere
 from goae_kalkulator.katalog import Katalog, KatalogFehler
@@ -500,6 +502,69 @@ class TestExcel(unittest.TestCase):
         with zipfile.ZipFile(pfad) as archiv:
             workbook = archiv.read("xl/workbook.xml").decode()
         self.assertNotIn("[", workbook.split('name="')[1].split('"')[0])
+
+
+class TestFarbschema(unittest.TestCase):
+    """Ein Farbschema, drei Fassungen - sie duerfen nicht auseinanderlaufen."""
+
+    WURZEL = Path(__file__).resolve().parent.parent
+
+    def test_palette_stimmt_in_python_und_javascript_ueberein(self):
+        aus_python = {
+            name: wert for name, wert in vars(farben).items()
+            if name.isupper() and isinstance(wert, str)
+        }
+        quelle = (self.WURZEL / "app" / "js" / "farben.js").read_text(encoding="utf-8")
+        aus_js = dict(re.findall(r"export const ([A-Z_]+) = '(#[0-9A-Fa-f]{6})'", quelle))
+        self.assertEqual(aus_python, aus_js,
+                         "farben.py und app/js/farben.js weichen voneinander ab")
+
+    def test_stylesheet_der_app_verwendet_dieselben_farben(self):
+        quelle = (self.WURZEL / "app" / "js" / "xlsx.js").read_text(encoding="utf-8")
+        # Im Vorlagentext stehen Platzhalter; gepruefte Groesse sind die
+        # verwendeten Farbnamen, nicht die eingesetzten Werte.
+        verwendet = set(re.findall(r"\$\{exf\(([A-Z_]+)\)\}", quelle))
+        erwartet = set(re.findall(r"farben\.excel\(farben\.([A-Z_]+)\)",
+                                  (self.WURZEL / "goae_kalkulator" / "excel.py").read_text(encoding="utf-8")))
+        self.assertEqual(verwendet, erwartet,
+                         "Die Excel-Ausgaben von Programm und App nutzen verschiedene Farben")
+
+    @staticmethod
+    def _variablen(css: str, ab: int) -> dict[str, str]:
+        """Liest die Variablen des Blocks, der bei `ab` beginnt."""
+        block = css[ab:css.index("}", ab)]
+        return {n: w.upper() for n, w in re.findall(r"--([a-z0-9-]+): (#[0-9a-fA-F]{6});", block)}
+
+    def test_helles_erscheinungsbild_nutzt_die_palette(self):
+        css = (self.WURZEL / "app" / "app.css").read_text(encoding="utf-8")
+        hell = self._variablen(css, css.index(":root {"))
+        for name, wert in [("marke", farben.GRUEN), ("marke-stark", farben.GRUEN_STARK),
+                           ("text-leise", farben.GRAU), ("text", farben.TEXT),
+                           ("warnung", farben.WARNUNG), ("fehler", farben.FEHLER),
+                           ("gut", farben.GUT)]:
+            self.assertEqual(hell.get(name), wert.upper(),
+                             f"--{name} im hellen Erscheinungsbild passt nicht zur Palette")
+
+    def test_dunkles_erscheinungsbild_dreht_den_markenton(self):
+        """Auf dunklem Grund traegt das Hellgruen des Strangs, nicht das Flaechengruen."""
+        css = (self.WURZEL / "app" / "app.css").read_text(encoding="utf-8")
+        dunkel = self._variablen(css, css.index("prefers-color-scheme: dark"))
+        self.assertEqual(dunkel.get("marke"), farben.HELLGRUEN.upper())
+
+    def test_excel_schreibweise(self):
+        self.assertEqual(farben.excel("#6C7569"), "FF6C7569")
+        self.assertEqual(farben.excel("6c7569"), "FF6C7569")
+
+    def test_erzeugte_tabelle_traegt_die_praxisfarben(self):
+        angebot = Angebot(name="Farbprobe")
+        angebot.hinzufuegen(Position.aus_leistung(leistung()))
+        with tempfile.TemporaryDirectory() as ordner:
+            pfad = exportiere(angebot, Path(ordner) / "farbe.xlsx")
+            with zipfile.ZipFile(pfad) as archiv:
+                stile = archiv.read("xl/styles.xml").decode()
+        self.assertIn(farben.excel(farben.GRUEN), stile)
+        self.assertIn(farben.excel(farben.GRUEN_TON), stile)
+        self.assertNotIn("FF1F4E79", stile, "alter Blauton noch enthalten")
 
 
 class TestKommandozeile(unittest.TestCase):

@@ -12,6 +12,7 @@ try:
 except ImportError:  # pragma: no cover - nur ohne installiertes tkinter
     tk = None
 
+from . import farben
 from .cli import betrag
 from .excel import exportiere
 from .katalog import Katalog, KatalogFehler
@@ -125,8 +126,19 @@ class Anwendung(tk.Tk):
             stil.theme_use("clam")
         except tk.TclError:
             pass
-        stil.configure("Summe.TLabel", font=("TkDefaultFont", 11, "bold"))
-        stil.configure("Gross.TLabel", font=("TkDefaultFont", 14, "bold"))
+        # Farben der Praxis - dieselbe Palette wie Excel-Ausgabe und App.
+        stil.configure("Summe.TLabel", font=("TkDefaultFont", 11, "bold"),
+                       foreground=farben.GRAU)
+        stil.configure("Gross.TLabel", font=("TkDefaultFont", 14, "bold"),
+                       foreground=farben.GRUEN)
+        # Von "clam" ignoriert, greift aber auf Themen, die es beachten.
+        stil.configure("TLabelframe.Label", foreground=farben.GRUEN)
+        stil.configure("Treeview.Heading", background=farben.GRUEN,
+                       foreground=farben.WEISS)
+        stil.map("Treeview.Heading", background=[("active", farben.GRUEN_STARK)])
+        stil.map("Treeview",
+                 background=[("selected", farben.GRUEN)],
+                 foreground=[("selected", farben.WEISS)])
 
         # -- Kopfbereich: Angebotsdaten
         kopf = ttk.LabelFrame(self, text="Angebot")
@@ -246,9 +258,9 @@ class Anwendung(tk.Tk):
         tabelle, self.baum_positionen = self._tabelle(rahmen, POSITION_SPALTEN,
                                                      selectmode="browse")
         tabelle.pack(side="top", fill="both", expand=True, padx=6, pady=(6, 4))
-        self.baum_positionen.tag_configure("warnung", foreground="#b45309")
-        self.baum_positionen.tag_configure("fehler", foreground="#b91c1c")
-        self.baum_positionen.tag_configure("fixiert", background="#eef2f7")
+        self.baum_positionen.tag_configure("warnung", foreground=farben.WARNUNG)
+        self.baum_positionen.tag_configure("fehler", foreground=farben.FEHLER)
+        self.baum_positionen.tag_configure("fixiert", background=farben.GRUEN_TON)
         self.baum_positionen.bind("<Double-1>", self._zelle_bearbeiten)
         self.baum_positionen.bind("<Delete>", lambda _e: self.entfernen())
         return rahmen

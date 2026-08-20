@@ -179,6 +179,25 @@ npm pack @fin.cx/fee-schedules && tar xzf fin.cx-fee-schedules-*.tgz
 python3 werkzeuge/katalog_erzeugen.py package/.onlygit/fee-schedules.json
 ```
 
+## Farbschema
+
+Schreibtischprogramm, Smartphone-App und Excel-Ausgabe verwenden dieselben
+Farben. Sie stammen aus dem Praxislogo (`werkzeuge/praxislogo.png`) und stehen
+als benannte Konstanten in `goae_kalkulator/farben.py` sowie – wortgleich – in
+`app/js/farben.js`.
+
+| Farbe | Herkunft | Verwendung |
+|---|---|---|
+| `#6C7569` | Grün der Logofläche | Tabellenköpfe, Summen, Hauptknöpfe, Ziffernnummern |
+| `#B7C4AF` | Hellgrün des Strangs | App-Symbol, Markenton im dunklen Erscheinungsbild |
+| `#585857` | Grau der Wortmarke | Nebentexte |
+| `#DCE4D7` | abgeleitet | Summenzeile der Tabelle, fixierte Positionen |
+
+Dass die drei Fassungen nicht auseinanderlaufen, sichern Testfälle ab: Sie
+vergleichen die Paletten von Python und JavaScript, prüfen die Variablen in
+`app.css` und stellen sicher, dass beide Excel-Ausgaben dieselben Farben
+setzen.
+
 ## Rechengrundlage
 
 ```

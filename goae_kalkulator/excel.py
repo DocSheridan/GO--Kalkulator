@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Sequence
 from xml.sax.saxutils import escape
 
+from . import farben
 from .modelle import Angebot
 
 # Formatvorlagen -> Index in cellXfs (siehe _STYLES_XML)
@@ -33,7 +34,9 @@ STIL = {
     "euro_hell": 10,
 }
 
-_STYLES_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+# Die Farben stammen aus farben.py; der erzeugte Text ist Zeichen fuer Zeichen
+# derselbe wie in der Smartphone-App (app/js/xlsx.js) - siehe Testfaelle.
+_STYLES_XML = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="2">
 <numFmt numFmtId="164" formatCode="#,##0.00\\ &quot;EUR&quot;"/>
@@ -42,20 +45,20 @@ _STYLES_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <fonts count="6">
 <font><sz val="11"/><name val="Calibri"/></font>
 <font><b/><sz val="11"/><name val="Calibri"/></font>
-<font><b/><sz val="15"/><color rgb="FF1F4E79"/><name val="Calibri"/></font>
-<font><i/><sz val="9"/><color rgb="FF7F7F7F"/><name val="Calibri"/></font>
-<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
-<font><sz val="10"/><color rgb="FF404040"/><name val="Calibri"/></font>
+<font><b/><sz val="15"/><color rgb="{farben.excel(farben.GRUEN)}"/><name val="Calibri"/></font>
+<font><i/><sz val="9"/><color rgb="{farben.excel(farben.GRAU)}"/><name val="Calibri"/></font>
+<font><b/><sz val="11"/><color rgb="{farben.excel(farben.WEISS)}"/><name val="Calibri"/></font>
+<font><sz val="10"/><color rgb="{farben.excel(farben.GRAU)}"/><name val="Calibri"/></font>
 </fonts>
 <fills count="4">
 <fill><patternFill patternType="none"/></fill>
 <fill><patternFill patternType="gray125"/></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FF1F4E79"/><bgColor indexed="64"/></patternFill></fill>
-<fill><patternFill patternType="solid"><fgColor rgb="FFDCE6F1"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="{farben.excel(farben.GRUEN)}"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="{farben.excel(farben.GRUEN_TON)}"/><bgColor indexed="64"/></patternFill></fill>
 </fills>
 <borders count="2">
 <border><left/><right/><top/><bottom/><diagonal/></border>
-<border><left/><right/><top style="thin"><color rgb="FF1F4E79"/></top><bottom/><diagonal/></border>
+<border><left/><right/><top style="thin"><color rgb="{farben.excel(farben.GRUEN)}"/></top><bottom/><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
 <cellXfs count="11">
