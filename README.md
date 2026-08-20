@@ -14,6 +14,15 @@ Mitgeliefert ist das **vollständige amtliche Gebührenverzeichnis** mit 2.711
 GOÄ-Nummern. Das Programm braucht **nur Python 3.10 oder neuer** – keine
 weiteren Pakete, auch nicht für den Excel-Export.
 
+Es gibt zwei Anwendungen mit derselben Rechengrundlage:
+
+| | |
+|---|---|
+| **Schreibtischprogramm** (dieses Verzeichnis) | Fenster-Oberfläche, Konsole und Kommandozeile für Windows, macOS und Linux |
+| **[Smartphone-App](app/README.md)** (`app/`) | installierbare Web-App für iPhone und Android, läuft offline |
+
+Beide rechnen nachweislich gleich – siehe [Gleichlauf mit der App](#gleichlauf-mit-der-app).
+
 ## Start
 
 ```bash
@@ -203,14 +212,36 @@ goae_kalkulator/
   konsole.py                  menügeführte Bedienung
   cli.py                      Kommandozeile
 daten/goae_katalog.csv        Leistungskatalog (2.711 GOÄ-Nummern)
-werkzeuge/katalog_erzeugen.py Katalog aus dem amtlichen GOÄ-Text erzeugen
+werkzeuge/
+  katalog_erzeugen.py         Katalog aus dem amtlichen GOÄ-Text erzeugen
+  katalog_fuer_app.py         Katalog für die Smartphone-App aufbereiten
+  pruefvektoren.py            Prüfvektoren für den Abgleich mit der App
+app/                          Smartphone-App (siehe app/README.md)
 tests/test_kalkulator.py      Testfälle
+```
+
+## Gleichlauf mit der App
+
+Die Smartphone-App rechnet die Faktorverteilung in JavaScript nach. Damit die
+beiden Fassungen nicht auseinanderlaufen, arbeiten beide ohne Fließkomma –
+Beträge in ganzen Cent, Faktoren in Tausendsteln, und auch der
+Skalierungsparameter der Verteilung wird ganzzahlig gesucht.
+
+Geprüft wird das mit gemeinsamen Prüfvektoren: 200 zufällige, über einen festen
+Startwert reproduzierbare Fälle werden vom Python-Programm gerechnet und von
+der App nachgespielt. Verlangt wird Übereinstimmung **in jedem einzelnen
+Faktor**, nicht nur in der Summe.
+
+```bash
+python3 werkzeuge/pruefvektoren.py   # Fälle neu rechnen
+cd app && node --test                # App-Tests inklusive Abgleich
 ```
 
 ## Tests
 
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s tests -v   # Schreibtischprogramm, 68 Fälle
+cd app && node --test                      # Smartphone-App, 18 Fälle
 ```
 
 ## Haftungsausschluss

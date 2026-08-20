@@ -1,0 +1,19 @@
+{
+  "name": "GOÄ-Abrechnungskalkulator",
+  "short_name": "GOÄ-Kalkulator",
+  "description": "Kalkulation privatärztlicher Leistungspakete nach der Gebührenordnung für Ärzte",
+  "lang": "de",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6f9",
+  "theme_color": "#1f4e79",
+  "categories": ["medical", "productivity", "finance"],
+  "icons": [
+    { "src": "symbole/symbol-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "symbole/symbol-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "symbole/symbol-maskierbar-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

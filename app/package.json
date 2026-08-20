@@ -1,0 +1,6 @@
+{
+  "name": "goae-kalkulator-app",
+  "private": true,
+  "type": "module",
+  "description": "Nur damit Node die ES-Module beim Testen laedt - die App selbst braucht kein npm."
+}

@@ -10,6 +10,10 @@ from typing import Any
 # Punktwert nach § 5 Abs. 1 GOAE: 5,82873 Cent je Punkt.
 PUNKTWERT = Decimal("0.0582873")
 
+# Derselbe Punktwert als Ganzzahl in Einheiten von 10^-7 EUR. Wird dort
+# gebraucht, wo ohne Fliesskomma gerechnet werden muss.
+PUNKTWERT_E7 = 582873
+
 # Vom Anwender gewuenschte Anzeigespalten (einfacher Satz, Regelsatz, Hoechstsatz).
 ANZEIGE_FAKTOREN = (Decimal("1.0"), Decimal("2.3"), Decimal("3.5"))
 

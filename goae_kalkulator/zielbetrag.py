@@ -27,8 +27,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Iterable, Sequence
 
 from .modelle import (
-    FAKTOR_RASTER, FAKTOR_SCHRITT, MAX_FAKTOR, MIN_FAKTOR, PUNKTWERT, Position,
-    euro, geld, faktor as _runde_faktor,
+    FAKTOR_RASTER, FAKTOR_SCHRITT, MAX_FAKTOR, MIN_FAKTOR, PUNKTWERT, PUNKTWERT_E7,
+    Position, euro, geld, faktor as _runde_faktor,
 )
 
 STRATEGIEN = ("proportional", "einheitlich", "regelsatz")
@@ -95,6 +95,19 @@ def _startwert(position: Position, strategie: str) -> Decimal:
 
 def _klemme(wert: Decimal, unten: Decimal, oben: Decimal) -> Decimal:
     return max(unten, min(oben, wert))
+
+
+# Der Skalierungsparameter wird als Ganzzahl in Milliardsteln gefuehrt. Das
+# macht die Suche unabhaengig von Fliesskomma - und damit Schritt fuer Schritt
+# nachvollziehbar identisch zur Fassung in der Smartphone-App.
+_EINS_E9 = 10 ** 9
+
+
+def _teile_kaufmaennisch(zaehler: int, nenner: int) -> int:
+    """Ganzzahlige Division, Bruchteile ab 0,5 aufgerundet."""
+    if zaehler < 0:
+        return -((-2 * zaehler + nenner) // (2 * nenner))
+    return (2 * zaehler + nenner) // (2 * nenner)
 
 
 def optimiere_faktoren(
@@ -209,28 +222,31 @@ def optimiere_faktoren(
 
     # -- Schritt 1: gemeinsamen Skalierungsfaktor per Bisektion suchen -------
     grob = schrittweite
-    starts = [_startwert(p, strategie) for p in variabel]
+    raster_milli = int(grob * 1000)
+    starts_milli = [int(_startwert(p, strategie) * 1000) for p in variabel]
 
-    def faktoren_bei(lam: float) -> list[Decimal]:
-        skala = Decimal(str(lam))
-        return [
-            _klemme((start * skala).quantize(grob, rounding=ROUND_HALF_UP), g[0], g[1])
-            for start, g in zip(starts, grenzen)
-        ]
+    def faktoren_bei(lam_e9: int) -> list[Decimal]:
+        werte = []
+        for start_milli, (lo, hi) in zip(starts_milli, grenzen):
+            milli = _teile_kaufmaennisch(
+                start_milli * lam_e9, _EINS_E9 * raster_milli
+            ) * raster_milli
+            werte.append(_klemme(Decimal(milli) / 1000, lo, hi))
+        return werte
 
-    def summe_bei(lam: float) -> Decimal:
+    def summe_bei(lam_e9: int) -> Decimal:
         return fest_summe + sum(
-            (p.betrag_bei(f) for p, f in zip(variabel, faktoren_bei(lam))), Decimal("0.00")
+            (p.betrag_bei(f) for p, f in zip(variabel, faktoren_bei(lam_e9))), Decimal("0.00")
         )
 
-    unten, oben = 0.0, 10.0
-    for _ in range(120):
-        mitte = (unten + oben) / 2
+    unten, oben = 0, 10 * _EINS_E9
+    while oben - unten > 1:
+        mitte = (unten + oben) // 2
         if summe_bei(mitte) < ziel:
             unten = mitte
         else:
             oben = mitte
-    faktoren = faktoren_bei((unten + oben) / 2)
+    faktoren = faktoren_bei(oben)
 
     # -- Schritt 2/3: Restbetrag im gewaehlten Raster feinverteilen ----------
     faktoren, rest = _feinabgleich(variabel, faktoren, grenzen, ziel - fest_summe, grob)
@@ -307,6 +323,7 @@ def _feinabgleich(
     deshalb wird gerechnet statt schrittweise getastet.
     """
     faktoren = list(faktoren)
+    raster_milli = int(raster * 1000)
     betraege = [p.betrag_bei(f) for p, f in zip(positionen, faktoren)]
     rest = ziel_variabel - sum(betraege, Decimal("0.00"))
 
@@ -315,12 +332,14 @@ def _feinabgleich(
             break
         bester = None  # (verbesserung, index, faktor, betrag, rest)
         for i, (p, (lo, hi)) in enumerate(zip(positionen, grenzen)):
-            teiler = Decimal(p.punktzahl) * PUNKTWERT * Decimal(p.anzahl)
-            if teiler == 0:
+            nenner = p.punktzahl * PUNKTWERT_E7 * p.anzahl
+            if nenner == 0:
                 continue
-            # Faktor, mit dem diese Ziffer den fehlenden Betrag genau traefe.
-            roh = (betraege[i] + rest) / teiler
-            mitte = roh.quantize(raster, rounding=ROUND_HALF_UP)
+            # Faktor, mit dem diese Ziffer den fehlenden Betrag genau traefe -
+            # ganzzahlig gerechnet, damit App und Programm gleich entscheiden.
+            zaehler = int((betraege[i] + rest) * 100) * 10 ** 8
+            mitte_milli = _teile_kaufmaennisch(zaehler, nenner * raster_milli) * raster_milli
+            mitte = Decimal(mitte_milli) / 1000
             for versatz in range(-3, 4):
                 kandidat = _klemme(mitte + versatz * raster, lo, hi)
                 if kandidat == faktoren[i]:

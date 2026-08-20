@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4e79" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1b26" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Kalkulation privatärztlicher Leistungspakete nach der GOÄ">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GOÄ-Kalkulator">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="symbole/symbol-180.png">
+<link rel="icon" href="symbole/symbol-192.png">
+<link rel="stylesheet" href="app.css">
+<title>GOÄ-Kalkulator</title>
+</head>
+<body>
+
+<header class="kopf">
+  <div class="kopf-titel">
+    <h1>GOÄ-Kalkulator</h1>
+    <p id="kopf-unterzeile">Katalog wird geladen …</p>
+  </div>
+  <button type="button" id="knopf-hilfe" class="kopf-knopf" aria-label="Hilfe">?</button>
+</header>
+
+<main>
+  <!-- ------------------------------------------------ Angebot -->
+  <section id="ansicht-angebot" class="ansicht" aria-label="Angebot">
+    <div class="feldgruppe">
+      <label class="feld">
+        <span>Name des Angebots</span>
+        <input type="text" id="feld-name" placeholder="z. B. Vorsorge Premium" autocomplete="off">
+      </label>
+      <div class="feld-paar">
+        <label class="feld">
+          <span>Patient/in</span>
+          <input type="text" id="feld-patient" placeholder="optional" autocomplete="off">
+        </label>
+        <label class="feld">
+          <span>Beschreibung</span>
+          <input type="text" id="feld-beschreibung" placeholder="optional" autocomplete="off">
+        </label>
+      </div>
+    </div>
+
+    <div id="positionen" class="positionen"></div>
+
+    <div id="leer-hinweis" class="leerhinweis">
+      <p><strong>Noch keine Ziffern im Angebot.</strong></p>
+      <p>Wechseln Sie zum Katalog und tippen Sie auf eine GOÄ-Ziffer, um sie zu übernehmen.</p>
+      <button type="button" class="knopf gross" data-wechsel="katalog">Zum Katalog</button>
+    </div>
+
+    <section class="block" id="block-ziel">
+      <h2>Gesamtpreis vorgeben</h2>
+      <p class="block-hinweis">Das Programm verteilt die Faktoren so, dass die Summe erreicht wird.
+        Kein Faktor wird kleiner als 1,0 oder größer als 3,5.</p>
+      <div class="ziel-zeile">
+        <label class="feld">
+          <span>Zielbetrag in Euro</span>
+          <input type="text" id="feld-ziel" inputmode="decimal" placeholder="z. B. 250,00">
+        </label>
+        <button type="button" id="knopf-verteilen" class="knopf haupt">Faktoren verteilen</button>
+      </div>
+      <label class="feld">
+        <span>Verteilung</span>
+        <select id="feld-strategie"></select>
+      </label>
+      <div class="feld-paar">
+        <label class="feld">
+          <span>Faktorstufung</span>
+          <select id="feld-raster">
+            <option value="100">0,1 (üblich)</option>
+            <option value="50">0,05</option>
+            <option value="10">0,01</option>
+          </select>
+        </label>
+        <div class="schalter-spalte">
+          <label class="schalter">
+            <input type="checkbox" id="feld-centgenau">
+            <span>Betrag centgenau treffen</span>
+          </label>
+          <label class="schalter">
+            <input type="checkbox" id="feld-rechtlich">
+            <span>Höchstsätze der Klassen beachten</span>
+          </label>
+        </div>
+      </div>
+      <p id="ziel-meldung" class="meldung" hidden></p>
+      <p id="ziel-spanne" class="block-hinweis"></p>
+    </section>
+
+    <section class="block">
+      <h2>Angebot sichern und weitergeben</h2>
+      <div class="knopfreihe">
+        <button type="button" id="knopf-speichern" class="knopf haupt">Speichern</button>
+        <button type="button" id="knopf-excel" class="knopf">Excel</button>
+        <button type="button" id="knopf-neu" class="knopf">Neues Angebot</button>
+      </div>
+    </section>
+  </section>
+
+  <!-- ------------------------------------------------ Katalog -->
+  <section id="ansicht-katalog" class="ansicht" aria-label="Katalog" hidden>
+    <div class="suchleiste">
+      <input type="search" id="feld-suche" placeholder="Ziffer oder Leistung suchen"
+             autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+      <div class="such-einstellung">
+        <label class="feld klein">
+          <span>Anzahl</span>
+          <input type="number" id="feld-anzahl" value="1" min="1" max="99" inputmode="numeric">
+        </label>
+        <label class="feld klein">
+          <span>Faktor beim Übernehmen</span>
+          <select id="feld-startfaktor">
+            <option value="regel">Regelsatz</option>
+            <option value="1000">1,0</option>
+            <option value="2300">2,3</option>
+            <option value="3500">3,5</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <p id="such-ergebnis" class="block-hinweis"></p>
+    <div id="katalogliste" class="katalogliste"></div>
+    <button type="button" id="knopf-mehr" class="knopf gross" hidden>Weitere anzeigen</button>
+  </section>
+
+  <!-- ------------------------------------------------ Gespeichert -->
+  <section id="ansicht-gespeichert" class="ansicht" aria-label="Gespeicherte Angebote" hidden>
+    <div class="knopfreihe">
+      <button type="button" id="knopf-neu-2" class="knopf haupt">Neues Angebot</button>
+    </div>
+    <div id="angebotsliste" class="angebotsliste"></div>
+  </section>
+</main>
+
+<div id="summenleiste" class="summenleiste">
+  <div class="summen-vergleich">
+    <span><b>1,0</b> <i id="summe-e1">0,00</i></span>
+    <span><b>2,3</b> <i id="summe-e23">0,00</i></span>
+    <span><b>3,5</b> <i id="summe-e35">0,00</i></span>
+  </div>
+  <div class="summen-ist">
+    <span>kalkuliert</span>
+    <strong id="summe-ist">0,00 €</strong>
+  </div>
+</div>
+
+<nav class="reiter" aria-label="Bereiche">
+  <button type="button" class="reiter-knopf aktiv" data-wechsel="angebot">
+    <span class="reiter-symbol" aria-hidden="true">▤</span>Angebot
+  </button>
+  <button type="button" class="reiter-knopf" data-wechsel="katalog">
+    <span class="reiter-symbol" aria-hidden="true">⌕</span>Katalog
+  </button>
+  <button type="button" class="reiter-knopf" data-wechsel="gespeichert">
+    <span class="reiter-symbol" aria-hidden="true">▣</span>Gespeichert
+  </button>
+</nav>
+
+<div id="hinweisfeld" class="hinweisfeld" role="status" aria-live="polite" hidden></div>
+
+<dialog id="dialog" class="dialog">
+  <form method="dialog">
+    <h2 id="dialog-titel"></h2>
+    <p id="dialog-text"></p>
+    <input type="text" id="dialog-eingabe" hidden autocomplete="off">
+    <div class="knopfreihe">
+      <button type="submit" value="abbrechen" class="knopf">Abbrechen</button>
+      <button type="submit" value="ok" class="knopf haupt" id="dialog-ok">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
