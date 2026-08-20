@@ -1,0 +1,65 @@
+# Veroeffentlicht die Smartphone-App als GitHub Pages.
+#
+# Der Ordner app/ laesst sich nicht ueber die Branch-Einstellung von Pages
+# veroeffentlichen - dort stehen nur "/" und "/docs" zur Wahl. Dieser Ablauf
+# laedt app/ stattdessen unmittelbar als Pages-Inhalt hoch, ohne die Dateien
+# im Repository zu verdoppeln.
+#
+# Beim ersten Lauf schaltet "configure-pages" die Veroeffentlichung selbst
+# ein (enablement: true). Sollte das an Berechtigungen scheitern, genuegt
+# einmalig: Settings > Pages > Source: GitHub Actions.
+
+name: App veroeffentlichen
+
+on:
+  push:
+    branches:
+      - claude/goae-abrechnungskalkulator-1n0lak
+    paths:
+      - 'app/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Laufende Veroeffentlichungen nicht abbrechen, aber auch nicht ueberholen.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  pruefen:
+    name: Tests der App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Testfaelle ausfuehren
+        run: node --test
+        working-directory: app
+
+  veroeffentlichen:
+    name: Veroeffentlichen
+    needs: pruefen
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pages einrichten
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: App hochladen
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: app
+      - name: Veroeffentlichen
+        id: pages
+        uses: actions/deploy-pages@v4

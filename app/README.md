@@ -12,11 +12,21 @@ App – eigenes Symbol, eigenes Fenster ohne Browserleiste, kein Netz nötig.
 Die Dateien müssen über **https** erreichbar sein (oder über `localhost`);
 andernfalls verweigern iOS und Android den Offlinebetrieb.
 
-### Mit GitHub Pages (am einfachsten)
+### Über GitHub Pages (eingerichtet)
 
-Im Repository unter *Settings → Pages* als Quelle den Branch wählen und als
-Ordner `/app`. Nach wenigen Minuten ist die App unter
-`https://<konto>.github.io/<repository>/` erreichbar.
+Die Veröffentlichung läuft automatisch: `.github/workflows/pages.yml` führt bei
+jeder Änderung an `app/` erst die Tests aus und stellt die App anschließend
+bereit unter
+
+**https://docsheridan.github.io/GO--Kalkulator/**
+
+Der Umweg über einen Arbeitsablauf ist nötig, weil die Branch-Einstellung von
+GitHub Pages nur `/` oder `/docs` als Quellordner anbietet – `app/` lässt sich
+so nicht veröffentlichen, und die Dateien sollten nicht doppelt im Repository
+liegen.
+
+Wird der Branch später umbenannt oder nach `main` überführt, ist der
+Branch-Name oben in `pages.yml` anzupassen.
 
 ### Auf eigenem Webspace
 

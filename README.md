@@ -19,7 +19,7 @@ Es gibt zwei Anwendungen mit derselben Rechengrundlage:
 | | |
 |---|---|
 | **Schreibtischprogramm** (dieses Verzeichnis) | Fenster-Oberfläche, Konsole und Kommandozeile für Windows, macOS und Linux |
-| **[Smartphone-App](app/README.md)** (`app/`) | installierbare Web-App für iPhone und Android, läuft offline |
+| **[Smartphone-App](app/README.md)** (`app/`) | installierbare Web-App für iPhone und Android, läuft offline – veröffentlicht unter [docsheridan.github.io/GO--Kalkulator](https://docsheridan.github.io/GO--Kalkulator/) |
 
 Beide rechnen nachweislich gleich – siehe [Gleichlauf mit der App](#gleichlauf-mit-der-app).
 
@@ -217,6 +217,7 @@ werkzeuge/
   katalog_fuer_app.py         Katalog für die Smartphone-App aufbereiten
   pruefvektoren.py            Prüfvektoren für den Abgleich mit der App
 app/                          Smartphone-App (siehe app/README.md)
+.github/workflows/pages.yml   Tests und Veröffentlichung der App
 tests/test_kalkulator.py      Testfälle
 ```
 
