@@ -160,8 +160,8 @@ class TestMitgelieferterKatalog(unittest.TestCase):
         cls.katalog = Katalog.laden()
 
     def test_umfang(self):
-        # Das Gebuehrenverzeichnis umfasst rund 2 700 bepunktete Nummern.
-        self.assertGreater(len(self.katalog), 2500)
+        # Das Gebuehrenverzeichnis umfasst rund 2 800 bepunktete Nummern.
+        self.assertGreater(len(self.katalog), 2700)
 
     def test_bekannte_betraege(self):
         for nummer, punkte, einfach, satz23, satz35 in [
@@ -218,20 +218,54 @@ class TestMitgelieferterKatalog(unittest.TestCase):
         for l in self.katalog:
             self.assertGreater(l.punktzahl, 0, f"Ziffer {l.nummer}")
             self.assertTrue(l.bezeichnung.strip(), f"Ziffer {l.nummer}")
-            self.assertIn(l.herkunft, ("eigen", "gruppe"), f"Ziffer {l.nummer}")
+            self.assertIn(l.herkunft, ("direkt", "sammel"), f"Ziffer {l.nummer}")
 
     def test_buchstabenzusatz_sortiert_hinter_der_grundnummer(self):
         nummern = [l.nummer for l in self.katalog]
         self.assertEqual(nummern[nummern.index("250"):nummern.index("250") + 3],
                          ["250", "250a", "251"])
 
-    def test_gruppenpunktzahl_wird_gekennzeichnet(self):
-        # Nr. 3514 (Glukose) teilt sich die Punktzahl mit dem Gruppeneintrag 3511.
+    def test_sammelposition_wird_gekennzeichnet(self):
+        """Nr. 3514 (Glukose) steht in einer Sammelposition mit eigener Punktzahl."""
         glukose = self.katalog.hole("3514")
-        self.assertEqual(glukose.herkunft, "gruppe")
-        self.assertEqual(glukose.punktzahl, self.katalog.hole("3511").punktzahl)
+        self.assertEqual(glukose.herkunft, "sammel")
+        self.assertEqual(glukose.punktzahl, 70)
+        # Nicht die Punktzahl der davorstehenden Nummer 3511 (50 Punkte).
+        self.assertNotEqual(glukose.punktzahl, self.katalog.hole("3511").punktzahl)
         position = Position.aus_leistung(glukose, faktorwert=Decimal("1.15"))
-        self.assertIn("Gruppe", position.hinweis())
+        self.assertIn("Sammelposition", position.hinweis())
+
+    def test_punktzahlen_aus_sammelpositionen(self):
+        """Diese Werte waren einmal falsch - sie stammen aus der Ueberschrift
+        der Sammelposition, nicht von der davorstehenden Nummer."""
+        for nummer, punkte, bezeichnung in [
+            ("3504", 60, "Erythrozyten"),
+            ("3514", 70, "Glukose"),
+            ("4030", 250, "Thyreoidea stimulierendes Hormon (TSH)"),
+            ("4022", 250, "Freies Trijodthyronin (fT3)"),
+            ("4023", 250, "Freies Thyroxin (fT4)"),
+            ("4031", 250, "Thyroxin"),
+            ("4032", 250, "Trijodthyronin"),
+            ("4705", 120, "Aspergillus"),
+            ("4640", 250, "Adeno-Viren"),
+            ("K 1", 120, "Zuschlag zu Untersuchungen"),
+        ]:
+            l = self.katalog.hole(nummer)
+            self.assertEqual(l.punktzahl, punkte, f"Ziffer {nummer}")
+            self.assertIn(bezeichnung[:20], l.bezeichnung, f"Ziffer {nummer}")
+
+    def test_tsh_ergibt_den_erwarteten_betrag(self):
+        tsh = self.katalog.hole("4030")
+        self.assertEqual(tsh.einfachsatz, Decimal("14.57"))
+        self.assertEqual(tsh.betrag(Decimal("1.15")), Decimal("16.76"))
+        self.assertEqual(tsh.klasse, "labor")
+
+    def test_hundertsatz_zuschlaege_sind_nicht_enthalten(self):
+        """441 und 5298 werden als Hundertsatz der Bezugsleistung berechnet und
+        haben keine Punktzahl - sie duerfen nicht mit einer erfundenen im
+        Katalog stehen."""
+        for nummer in ("441", "5298"):
+            self.assertNotIn(nummer, self.katalog)
 
     def test_zuschlagsziffern_mit_leerzeichen(self):
         self.assertEqual(zerlege_ziffer("K 2"), ("K 2", 1, None))

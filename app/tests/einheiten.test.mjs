@@ -78,7 +78,7 @@ test('Summen und Spanne eines Angebots', () => {
 });
 
 test('mitgelieferter Katalog', () => {
-  assert.ok(katalog.anzahl > 2500);
+  assert.ok(katalog.anzahl > 2700);
   assert.equal(katalog.hole('1').punktzahl, 80);
   assert.equal(katalog.hole('3511').klasse, 'l');
   assert.equal(katalog.hole('437').klasse, 'l');   // § 5 Abs. 4 nennt Nr. 437
@@ -87,6 +87,31 @@ test('mitgelieferter Katalog', () => {
   assert.equal(katalog.suche('gibtesnicht').gesamt, 0);
   assert.equal(katalog.suche('1').liste[0].nummer, '1');
   assert.throws(() => katalog.hole('99999'));
+});
+
+test('Punktzahlen aus Sammelpositionen', () => {
+  // Diese Werte waren einmal falsch - sie stammen aus der Überschrift der
+  // Sammelposition, nicht von der davorstehenden Nummer.
+  for (const [nummer, punkte] of [
+    ['3504', 60], ['3514', 70], ['4030', 250], ['4022', 250], ['4023', 250],
+    ['4031', 250], ['4032', 250], ['4705', 120], ['4640', 250], ['K 1', 120],
+  ]) {
+    assert.equal(katalog.hole(nummer).punktzahl, punkte, `Ziffer ${nummer}`);
+  }
+  assert.equal(katalog.hole('3514').herkunft, 'sammel');
+});
+
+test('TSH ergibt den erwarteten Betrag', () => {
+  const tsh = katalog.hole('4030');
+  const p = new Position({ ...tsh, faktor: 1150 });
+  assert.equal(geld(new Position({ ...tsh, faktor: 1000 }).betrag), '14,57');
+  assert.equal(geld(p.betrag), '16,76');
+  assert.equal(tsh.klasse, 'l');
+});
+
+test('Hundertsatz-Zuschläge sind nicht enthalten', () => {
+  // 441 und 5298 werden als Hundertsatz der Bezugsleistung berechnet.
+  for (const nummer of ['441', '5298']) assert.throws(() => katalog.hole(nummer));
 });
 
 test('Suche über mehrere Wörter', () => {

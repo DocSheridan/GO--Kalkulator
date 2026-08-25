@@ -10,7 +10,7 @@ oder man gibt den **gewünschten Gesamtpreis** vor und das Programm verteilt die
 Faktoren automatisch so, dass die Summe erreicht wird. Kein Faktor wird dabei
 kleiner als 1,0 oder größer als 3,5.
 
-Mitgeliefert ist das **vollständige amtliche Gebührenverzeichnis** mit 2.711
+Mitgeliefert ist das **vollständige amtliche Gebührenverzeichnis** mit 2.790
 GOÄ-Nummern. Das Programm braucht **nur Python 3.10 oder neuer** – keine
 weiteren Pakete, auch nicht für den Excel-Export.
 
@@ -111,7 +111,7 @@ Summen; werden mehrere Angebote exportiert, kommt ein Übersichtsblatt hinzu.
 ## Leistungskatalog
 
 Mitgeliefert ist das **vollständige amtliche Gebührenverzeichnis der GOÄ** mit
-2.711 Nummern von 1 (Beratung) bis 6018 (Sektionsleistungen).
+2.790 Nummern von 1 (Beratung) bis 6018 (Sektionsleistungen).
 
 | | |
 |---|---|
@@ -151,15 +151,49 @@ Die Nummernbereiche der Abschnitte: B 1–109, C 200–449, D 450–498, E 500�
 F 600–793, G 800–887, H 1001–1168, I 1200–1386, J 1400–1639, K 1700–1860,
 L 2000–3321, M 3500–4787, N 4800–4873, O 5000–5855, P 6000–6018.
 
-### Gruppenpunktzahlen
+### Sammelpositionen
 
-Im gedruckten Verzeichnis teilen sich manche Nummern eine Punktzahl in einer
-verbundenen Zelle — im Basislabor etwa die Nummern 3512 bis 3526, die alle mit
-der Punktzahl von 3511 abgerechnet werden. Solche Einträge tragen in der Spalte
-`herkunft` den Wert `gruppe`, sind in der Katalogliste mit `*` markiert und
-erhalten in der Position einen Hinweis. 425 der 2.711 Nummern sind so
-entstanden; 57 Zeilen ohne eindeutig zuzuordnende Punktzahl wurden nicht
-übernommen.
+Das Gebührenverzeichnis führt viele Laborleistungen als **Sammelposition**: Eine
+Überschrift ohne eigene Nummer trägt die Punktzahl, darunter folgt nach dem Wort
+„Katalog" eine Liste von Nummern, die alle mit dieser Punktzahl berechnet
+werden.
+
+```
+Untersuchung folgender Meßgrößen ..., je Meßgröße        70   7,98
+Katalog   3512 Alpha-Amylase   3513 Gamma-GT   3514 Glukose   ...
+```
+
+503 der 2.790 Nummern gehören zu einer solchen Sammelposition. Sie tragen in der
+Spalte `herkunft` den Wert `sammel`, sind in der Katalogliste mit `*` markiert
+und erhalten in der Position einen Hinweis.
+
+### Was nicht im Katalog steht
+
+Die Nummern **441** (Laser-Zuschlag) und **5298** (digitale Radiographie) werden
+nach dem Verzeichnis als Hundertsatz der Bezugsleistung berechnet — 100 bzw.
+25 v. H. des einfachen Gebührensatzes — und haben deshalb keine eigene
+Punktzahl. Sie sind bewusst nicht enthalten, statt sie mit einem erfundenen Wert
+zu führen.
+
+Ebenfalls nicht abgebildet sind die Höchstwert-Regeln des Labors (im Text durch
+Zusätze wie `.H1` an der Nummer gekennzeichnet) und die übrigen Allgemeinen
+Bestimmungen zu Ausschlüssen und Kombinationen. Das Programm rechnet Beträge,
+es prüft keine Abrechnungsregeln.
+
+### Prüfung der Punktzahlen
+
+Der Katalog ist gegen den amtlichen Volltext nachgeprüft:
+
+- Für alle 2.287 Nummern, die im Verzeichnis eine eigene Punktzahl tragen, wurde
+  diese unabhängig aus dem Volltext ausgelesen und mit der Tabellenaufbereitung
+  verglichen — **2.287 Übereinstimmungen, keine Abweichung.**
+- Zusätzlich wurde jede Punktzahl gegen die gedruckte DM-Spalte gerechnet
+  (0,114 DM je Punkt). Alle 73 Sammelüberschriften und 2.241 von 2.243
+  Einzeleinträgen stimmen.
+- Die zwei Ausreißer sind Unstimmigkeiten **im amtlichen Text selbst**:
+  Nr. 2518 trägt 2.700 Punkte, aber 387,— DM (rechnerisch 307,80), Nr. 2542
+  1.800 Punkte bei 225,— DM (rechnerisch 205,20). Maßgeblich ist nach
+  § 5 Abs. 1 GOÄ die Punktzahl; der Katalog folgt ihr.
 
 ### Eigene Analogziffern
 
@@ -265,7 +299,7 @@ goae_kalkulator/
   gui.py                      Fenster-Oberfläche (tkinter)
   konsole.py                  menügeführte Bedienung
   cli.py                      Kommandozeile
-daten/goae_katalog.csv        Leistungskatalog (2.711 GOÄ-Nummern)
+daten/goae_katalog.csv        Leistungskatalog (2.790 GOÄ-Nummern)
 werkzeuge/
   katalog_erzeugen.py         Katalog aus dem amtlichen GOÄ-Text erzeugen
   katalog_fuer_app.py         Katalog für die Smartphone-App aufbereiten

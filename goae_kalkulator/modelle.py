@@ -77,10 +77,11 @@ class Leistung:
     klasse: str = "aerztlich"
     regelsatz: Decimal = Decimal("2.3")
     hoechstsatz: Decimal = Decimal("3.5")
-    # "eigen"  = Punktzahl steht bei dieser Nummer
-    # "gruppe" = sie gilt im Verzeichnis fuer eine Gruppe von Nummern
+    # "direkt" = Punktzahl steht im Verzeichnis bei dieser Nummer
+    # "sammel" = Nummer gehoert zu einer Sammelposition, deren Ueberschrift die
+    #            Punktzahl traegt (typisch im Labor)
     # "analog" = eigene Ziffer nach § 6 Abs. 2 GOAE
-    herkunft: str = "eigen"
+    herkunft: str = "direkt"
     # Bei Analogziffern die herangezogene Nummer des Gebuehrenverzeichnisses.
     analog_zu: str = ""
 
@@ -115,7 +116,7 @@ class Position:
     regelsatz: Decimal = Decimal("2.3")
     hoechstsatz: Decimal = Decimal("3.5")
     begruendung: str = ""
-    herkunft: str = "eigen"
+    herkunft: str = "direkt"
     analog_zu: str = ""
 
     def __post_init__(self) -> None:
@@ -184,8 +185,8 @@ class Position:
             return f"Faktor > Hoechstsatz {faktor_text(self.hoechstsatz)} ({self.klasse})"
         if self.ueber_regelsatz and not self.begruendung:
             return "Begruendung erforderlich (> Regelsatz)"
-        if self.herkunft == "gruppe":
-            return "Punktzahl gilt im Verzeichnis fuer eine Gruppe von Nummern"
+        if self.herkunft == "sammel":
+            return "Punktzahl stammt aus der Ueberschrift einer Sammelposition"
         return ""
 
     # -- Serialisierung ---------------------------------------------------
@@ -220,7 +221,7 @@ class Position:
             regelsatz=Decimal(str(daten.get("regelsatz", "2.3"))),
             hoechstsatz=Decimal(str(daten.get("hoechstsatz", "3.5"))),
             begruendung=daten.get("begruendung", ""),
-            herkunft=daten.get("herkunft", "eigen"),
+            herkunft=daten.get("herkunft", "direkt"),
             analog_zu=daten.get("analog_zu", ""),
         )
 

@@ -267,7 +267,7 @@ function zeichneKatalog() {
       + `<span class="katalog-saetze">${geld(betragFuer(l, 1000))} · ${geld(betragFuer(l, 2300))} · ${geld(betragFuer(l, 3500))} €`
       + (l.herkunft === 'analog'
         ? `  <span class="analog-marke">eigene Ziffer, analog ${maskiere(l.analogZu)}</span>`
-        : `  <span class="klasse">${l.abschnitt} / ${l.klassenname}${l.gruppe ? ' *' : ''}</span>`)
+        : `  <span class="klasse">${l.abschnitt} / ${l.klassenname}${l.herkunft === 'sammel' ? ' *' : ''}</span>`)
       + '</span></span>'
       + '<span class="katalog-plus" aria-hidden="true">+</span>';
     knopf.setAttribute('aria-label', `Ziffer ${l.nummer} übernehmen`);

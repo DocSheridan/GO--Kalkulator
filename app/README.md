@@ -171,7 +171,7 @@ app/
   js/speicher.js             Ablage auf dem Gerät
   js/xlsx.js                 Excel-Ausgabe ohne Fremdbibliothek
   js/app.js                  Bedienung
-  daten/goae_katalog.json    2 711 GOÄ-Ziffern (aus daten/goae_katalog.csv)
+  daten/goae_katalog.json    2 790 GOÄ-Ziffern (aus daten/goae_katalog.csv)
   symbole/                   App-Symbole
   tests/                     Testfälle und Prüfvektoren
 ```

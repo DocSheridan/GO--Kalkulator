@@ -5,7 +5,7 @@
  * Beim Aendern der Version wird der alte Bestand verworfen.
  */
 
-const VERSION = 'goae-v3';
+const VERSION = 'goae-v4';
 const BESTAND = [
   './',
   './index.html',

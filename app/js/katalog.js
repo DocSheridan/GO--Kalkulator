@@ -18,10 +18,9 @@ export class Katalog {
 
   static ausJson(inhalt) {
     const leistungen = inhalt.ziffern.map(
-      ([nummer, bezeichnung, punktzahl, abschnitt, klasse, regelsatz, hoechstsatz, gruppe]) => ({
+      ([nummer, bezeichnung, punktzahl, abschnitt, klasse, regelsatz, hoechstsatz, sammel]) => ({
         nummer, bezeichnung, punktzahl, abschnitt, klasse, regelsatz, hoechstsatz,
-        gruppe: gruppe === 1,
-        herkunft: gruppe === 1 ? 'gruppe' : 'eigen',
+        herkunft: sammel === 1 ? 'sammel' : 'direkt',
         analogZu: '',
         klassenname: KLASSEN[klasse]?.name ?? klasse,
         // Kleingeschrieben vorhalten - die Suche laeuft ueber 2 711 Eintraege

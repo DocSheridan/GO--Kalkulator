@@ -84,8 +84,7 @@ export class Position {
     this.regelsatz = daten.regelsatz ?? 2300;
     this.hoechstsatz = daten.hoechstsatz ?? 3500;
     this.begruendung = daten.begruendung ?? '';
-    this.gruppe = daten.gruppe ?? false;
-    this.herkunft = daten.herkunft ?? 'eigen';
+    this.herkunft = daten.herkunft ?? 'direkt';
     // Bei Analogziffern die herangezogene Nummer des Gebührenverzeichnisses.
     this.analogZu = daten.analogZu ?? '';
   }
@@ -101,7 +100,6 @@ export class Position {
       klasse: leistung.klasse,
       regelsatz: leistung.regelsatz,
       hoechstsatz: leistung.hoechstsatz,
-      gruppe: leistung.gruppe,
       herkunft: leistung.herkunft,
       analogZu: leistung.analogZu,
     });
@@ -136,8 +134,8 @@ export class Position {
     if (this.ueberRegelsatz && !this.begruendung) {
       return 'Begründung erforderlich (über Regelsatz)';
     }
-    if (this.gruppe) {
-      return 'Punktzahl gilt im Verzeichnis für eine Gruppe von Nummern';
+    if (this.herkunft === 'sammel') {
+      return 'Punktzahl stammt aus der Überschrift einer Sammelposition';
     }
     return '';
   }
@@ -147,7 +145,7 @@ export class Position {
       nummer: this.nummer, bezeichnung: this.bezeichnung, punktzahl: this.punktzahl,
       anzahl: this.anzahl, faktor: this.faktor, fixiert: this.fixiert,
       abschnitt: this.abschnitt, klasse: this.klasse, regelsatz: this.regelsatz,
-      hoechstsatz: this.hoechstsatz, begruendung: this.begruendung, gruppe: this.gruppe,
+      hoechstsatz: this.hoechstsatz, begruendung: this.begruendung,
       herkunft: this.herkunft, analogZu: this.analogZu,
     };
   }

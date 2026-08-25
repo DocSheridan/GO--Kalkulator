@@ -339,7 +339,7 @@ class Anwendung(tk.Tk):
                         geld(leistung.satz_3_5),
                         f"analog {leistung.analog_zu}" if leistung.herkunft == "analog"
                         else f"{leistung.abschnitt} / {leistung.klasse}"
-                        + (" *" if leistung.herkunft == "gruppe" else "")),
+                        + (" *" if leistung.herkunft == "sammel" else "")),
             )
 
     def _aktualisiere(self) -> None:

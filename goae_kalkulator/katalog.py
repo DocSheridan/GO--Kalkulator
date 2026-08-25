@@ -91,7 +91,7 @@ class Katalog:
                     klasse=klasse if klasse in KLASSEN else "aerztlich",
                     regelsatz=_dezimal(daten.get("regelsatz", ""), str(regel_std)),
                     hoechstsatz=_dezimal(daten.get("hoechstsatz", ""), str(hoechst_std)),
-                    herkunft=(daten.get("herkunft") or "eigen").lower(),
+                    herkunft=(daten.get("herkunft") or "direkt").lower(),
                     analog_zu=daten.get("analog_zu", ""),
                 )
             )

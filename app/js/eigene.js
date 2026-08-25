@@ -49,7 +49,6 @@ export class EigeneZiffern {
       klasse: e.klasse ?? 'a',
       regelsatz: e.regelsatz ?? 2300,
       hoechstsatz: e.hoechstsatz ?? 3500,
-      gruppe: false,
       herkunft: 'analog',
       analogZu: e.analog_zu ?? '',
     };

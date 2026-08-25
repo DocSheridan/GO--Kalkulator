@@ -121,15 +121,15 @@ def katalog_tabelle(leistungen, grenze: int | None = None) -> str:
         [l.nummer, l.bezeichnung[:52], str(l.punktzahl),
          geld(l.einfachsatz), geld(l.satz_2_3), geld(l.satz_3_5),
          (f"analog {l.analog_zu}" if l.herkunft == "analog"
-          else f"{l.abschnitt} / {l.klasse}" + (" *" if l.herkunft == "gruppe" else ""))]
+          else f"{l.abschnitt} / {l.klasse}" + (" *" if l.herkunft == "sammel" else ""))]
         for l in gekuerzt
     ]
     text = tabelle(
         ["Ziffer", "Leistung", "Punkte", "1,0-fach", "2,3-fach", "3,5-fach", "Abschn./Klasse"],
         zeilen, rechts={2, 3, 4, 5},
     )
-    if any(l.herkunft == "gruppe" for l in gekuerzt):
-        text += "\n* Punktzahl gilt im Verzeichnis fuer eine Gruppe von Nummern."
+    if any(l.herkunft == "sammel" for l in gekuerzt):
+        text += "\n* Punktzahl stammt aus der Ueberschrift einer Sammelposition."
     if grenze and len(leistungen) > grenze:
         text += f"\n... {len(leistungen) - grenze} weitere Treffer (Suchbegriff eingrenzen)"
     return text

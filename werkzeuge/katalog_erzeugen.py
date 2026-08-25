@@ -29,9 +29,26 @@ Was das Skript tut
   Abschnitt A ist kein eigener Nummernbereich, sondern die im
   Gebuehrenverzeichnis unter "A. Gebuehren in besonderen Faellen"
   namentlich aufgezaehlten Nummern; diese Liste steht unten.
-* uebernimmt Nummern, deren Punktzahl im gedruckten Verzeichnis in einer
-  verbundenen Zelle fuer eine Gruppe gilt (typisch im Basislabor), mit der
-  Punktzahl des Gruppeneintrags und kennzeichnet sie als "gruppe".
+* holt die Punktzahl von Nummern, die zu einer Sammelposition gehoeren, aus
+  dem Verzeichnistext
+
+Zu den Sammelpositionen
+-----------------------
+Das Gebuehrenverzeichnis fuehrt viele Laborleistungen als Sammelposition: Eine
+Ueberschrift ohne eigene Nummer traegt die Punktzahl, darunter folgt nach dem
+Wort "Katalog" eine Liste von Nummern, die alle mit dieser Punktzahl berechnet
+werden. Beispiel:
+
+    Untersuchung folgender Messgroessen ..., je Messgroesse   70   7,98
+    Katalog  3512 Alpha-Amylase  3513 Gamma-GT  3514 Glukose  ...
+
+Fuer diese Nummern enthaelt die Tabellenaufbereitung des Pakets keine
+Punktzahl. Sie wird deshalb aus dem Volltext der Anlage geholt: vom Eintrag
+rueckwaerts bis zum naechsten "Katalog", davor stehen Punktzahl und DM-Betrag
+der Ueberschrift.
+
+Nummern, die sich so nicht aufloesen lassen, werden nicht uebernommen, sondern
+gemeldet - geraten wird nichts.
 
 Die Betragsspalte des amtlichen Verzeichnisses ist noch in DM angegeben
 (0,114 DM je Punkt) und wird deshalb nicht uebernommen - der Eurobetrag
@@ -90,10 +107,27 @@ KLASSE_AERZTLICH = ("aerztlich", "2.3", "3.5")   # § 5 Abs. 2
 KLASSE_TECHNISCH = ("technisch", "1.8", "2.5")   # § 5 Abs. 3 (Abschnitte A, E, O)
 KLASSE_LABOR = ("labor", "1.15", "1.3")          # § 5 Abs. 4 (Abschnitt M, Nr. 437)
 
-# Groesster Nummernabstand, ueber den eine Gruppenpunktzahl noch uebernommen
-# wird. Verhindert, dass eine Punktzahl ueber einen Sprung in der
-# Dokumentreihenfolge hinweg auf voellig andere Leistungen uebertragen wird.
-MAX_GRUPPENABSTAND = 120
+# Punktzahl und DM-Betrag einer Sammelueberschrift, unmittelbar vor "Katalog".
+# Der Betrag steht mal mit Komma, mal mit Punkt, gelegentlich als "285,--".
+SAMMEL_MUSTER = re.compile(r"(\d{1,5})\s+[\d.]+[.,](?:\d{2}|--)\s+Katalog\s*$")
+
+# Innerhalb eines Sammelblocks: "<Nummer>[.H4] <Bezeichnung>"
+BLOCK_EINTRAG = re.compile(r"(?<![\w.])(\d{3,4})(?:\.[A-Z]\d?)?\s+(?=[A-ZÄÖÜ])")
+
+# Ende eines Sammelblocks: die naechste Ueberschrift mit Punktzahl und Betrag.
+BLOCK_ENDE = re.compile(r"\d{1,5}\s+[\d.]+[.,](?:\d{2}|--)")
+
+# "<Punktzahl> <DM-Betrag>" am Ende einer Leistungsbeschreibung.
+PREIS_MUSTER = re.compile(r"(?<![\d.,])(\d{1,5})\s+[\d.]+[.,](?:\d{2}|--)")
+
+# Beginn des naechsten Verzeichniseintrags.
+NAECHSTER_EINTRAG = re.compile(r"(?<![\w.,])\d{1,4}(?:\.[A-Z]\d?)?\s+[A-ZÄÖÜ]")
+
+# Zuschlaege, die als Hundertsatz der Bezugsleistung berechnet werden und
+# deshalb keine eigene Punktzahl haben (§ ... "v.H. des einfachen
+# Gebuehrensatzes der betreffenden Leistung").
+HUNDERTSATZ = {"441": "100 v.H. des einfachen Gebuehrensatzes, hoechstens 132 DM",
+               "5298": "25 v.H. des einfachen Gebuehrensatzes"}
 
 
 def zahl(code: str) -> int | None:
@@ -127,71 +161,157 @@ def saeubere(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").replace("­", "")).strip()
 
 
-def lies_zeilen(quelle: Path) -> list[dict]:
+def lies_quelle(quelle: Path) -> tuple[dict, list[dict], str]:
+    """Liefert Kopfangaben, die Tabellenzeilen und den Volltext der Anlage."""
     daten = json.loads(quelle.read_text(encoding="utf-8"))
-    plaene = daten.get("scheduleData", [])
-    goae = next((p for p in plaene if p.get("scheduleId") == "de-goae"), None)
+    goae = next((p for p in daten.get("scheduleData", [])
+                 if p.get("scheduleId") == "de-goae"), None)
     if goae is None:
         raise SystemExit("In der Quelldatei ist kein GOAE-Gebuehrenverzeichnis enthalten.")
-    return goae, goae["feeRows"]
+    anlage = next((a.get("text", "") for a in goae.get("ruleSections", [])
+                   if a.get("reference") == "Anlage"), "")
+    if not anlage:
+        raise SystemExit("Der Volltext der Anlage fehlt in der Quelldatei.")
+    return goae, goae["feeRows"], anlage
 
 
-def baue_eintraege(zeilen: list[dict]) -> tuple[list[dict], dict[str, int]]:
+class Volltext:
+    """Findet Punktzahlen im laufenden Text der Anlage.
+
+    Der Text folgt der Dokumentreihenfolge; ein mitwandernder Zeiger verhindert,
+    dass ein Querverweis im Fliesstext ("nach Nummer 3511") mit dem Eintrag
+    selbst verwechselt wird.
+    """
+
+    def __init__(self, text: str):
+        self.text = text
+        self.zeiger = 0
+
+    def stelle_von(self, code: str, bezeichnung: str) -> int | None:
+        marke = f"{code} {bezeichnung[:38]}"
+        stelle = self.text.find(marke, self.zeiger)
+        if stelle < 0:
+            stelle = self.text.find(marke)
+        if stelle < 0:
+            return None
+        self.zeiger = stelle + len(marke)
+        return stelle
+
+    def punktzahl_am_eintrag(self, stelle: int, code: str) -> int | None:
+        """Punktzahl hinter der Leistungsbeschreibung dieses Eintrags.
+
+        Gesucht wird "<Punktzahl> <DM-Betrag>" - der Betrag ist zwingend, sonst
+        wuerde in einer Sammelliste die naechste Nummer als Punktzahl gelesen
+        ("4020 Cortisol 4021 Follitropin ..." ergaebe 4021 Punkte). Das Fenster
+        endet am naechsten Eintrag, damit kein fremder Preis einwandert; die
+        Beschreibungen der Aufbereitung sind teils gekuerzt, weshalb nicht von
+        ihrer Laenge ausgegangen werden kann.
+        """
+        fenster = self.text[stelle:stelle + 420]
+        # Hinter der eigenen Nummer beginnen, sonst gilt sie selbst als
+        # naechster Eintrag ("K 1 Zuschlag ..." -> Fenster nach zwei Zeichen zu).
+        ab = len(code) + 1
+        for schranke in (fenster.find("Katalog"), NAECHSTER_EINTRAG.search(fenster, ab)):
+            grenze = schranke if isinstance(schranke, int) else (
+                schranke.start() if schranke else -1)
+            if grenze > 0:
+                fenster = fenster[:grenze]
+        treffer = PREIS_MUSTER.search(fenster)
+        return int(treffer.group(1)) if treffer else None
+
+    def punktzahl_der_sammelposition(self, stelle: int) -> int | None:
+        """Punktzahl der Ueberschrift, zu der dieser Eintrag gehoert."""
+        davor = self.text[max(0, stelle - 4000):stelle]
+        anker = davor.rfind("Katalog")
+        if anker < 0:
+            return None
+        treffer = SAMMEL_MUSTER.search(davor[:anker + len("Katalog")])
+        return int(treffer.group(1)) if treffer else None
+
+    def fehlende_nummern(self, bekannt: set[str]) -> list[tuple[str, str, int]]:
+        """Nummern in Sammelbloecken, die in der Tabellenaufbereitung fehlen.
+
+        Das Paket streicht den Hoechstwert-Zusatz (4022.H4 -> 4022) und verliert
+        dabei einige Eintraege ganz - hier werden sie nachgetragen.
+        """
+        gefunden: dict[str, tuple[str, int]] = {}
+        for anker in re.finditer(r"\bKatalog\b", self.text):
+            rest = self.text[anker.end():anker.end() + 4000]
+            # Punktzahl der Ueberschrift genau dieses Blocks.
+            kopf = SAMMEL_MUSTER.search(self.text[max(0, anker.start() - 300):anker.end()])
+            if kopf is None:
+                continue
+            punkte = int(kopf.group(1))
+            schluss = BLOCK_ENDE.search(rest)
+            block = rest[:schluss.start() if schluss else 3000]
+            stellen = list(BLOCK_EINTRAG.finditer(block))
+            for i, m in enumerate(stellen):
+                nummer = m.group(1)
+                if nummer in bekannt or nummer in gefunden:
+                    continue
+                bis = stellen[i + 1].start() if i + 1 < len(stellen) else len(block)
+                bezeichnung = saeubere(block[m.end():bis])
+                if bezeichnung:
+                    gefunden[nummer] = (bezeichnung, punkte)
+        return [(nr, bez, p) for nr, (bez, p) in sorted(gefunden.items())]
+
+
+def baue_eintraege(zeilen: list[dict], anlage: str) -> tuple[list[dict], dict, list[str]]:
+    volltext = Volltext(anlage)
     eintraege: list[dict] = []
     gesehen: set[str] = set()
-    zaehler = {"eigen": 0, "gruppe": 0, "verworfen": 0}
-    letzte_punktzahl: int | None = None
-    letzte_nummer: int | None = None
-    letzter_abschnitt: str = ""
+    zaehler = {"direkt": 0, "sammel": 0, "nachgetragen": 0}
+    offen: list[str] = []
+
+    def aufnehmen(code: str, bezeichnung: str, punktzahl: int, herkunft: str) -> None:
+        abschnitt, _titel = abschnitt_fuer(code)
+        klasse, regelsatz, hoechstsatz = klasse_fuer(code, abschnitt)
+        gesehen.add(code)
+        zaehler[herkunft] += 1
+        eintraege.append({
+            "nummer": code, "bezeichnung": bezeichnung, "punktzahl": int(punktzahl),
+            "abschnitt": abschnitt, "klasse": klasse,
+            "regelsatz": regelsatz, "hoechstsatz": hoechstsatz,
+            "herkunft": "direkt" if herkunft == "direkt" else "sammel",
+        })
 
     for zeile in zeilen:
         code = saeubere(str(zeile.get("code") or ""))
-        if not code:
-            continue
         bezeichnung = saeubere(str(zeile.get("description") or ""))
-        punktzahl = zeile.get("points")
-        abschnitt, _titel = abschnitt_fuer(code)
-        nummer = zahl(code)
-
-        if punktzahl:
-            herkunft = "eigen"
-            letzte_punktzahl, letzte_nummer, letzter_abschnitt = int(punktzahl), nummer, abschnitt
-        else:
-            # Punktzahl steht im gedruckten Verzeichnis in einer verbundenen
-            # Zelle beim Gruppeneintrag - nur uebernehmen, wenn die Nummer
-            # unmittelbar dazugehoert.
-            passend = (
-                letzte_punktzahl is not None
-                and nummer is not None
-                and letzte_nummer is not None
-                and abschnitt == letzter_abschnitt
-                and 0 < nummer - letzte_nummer <= MAX_GRUPPENABSTAND
-            )
-            if not passend:
-                zaehler["verworfen"] += 1
-                continue
-            punktzahl, herkunft = letzte_punktzahl, "gruppe"
-
-        if code in gesehen:
-            zaehler["verworfen"] += 1
+        if not code or code in gesehen:
             continue
-        gesehen.add(code)
 
-        klasse, regelsatz, hoechstsatz = klasse_fuer(code, abschnitt)
-        zaehler[herkunft] += 1
-        eintraege.append({
-            "nummer": code,
-            "bezeichnung": bezeichnung,
-            "punktzahl": int(punktzahl),
-            "abschnitt": abschnitt,
-            "klasse": klasse,
-            "regelsatz": regelsatz,
-            "hoechstsatz": hoechstsatz,
-            "herkunft": herkunft,
-        })
+        if zeile.get("points"):
+            aufnehmen(code, bezeichnung, int(zeile["points"]), "direkt")
+            volltext.stelle_von(code, bezeichnung)      # Zeiger mitfuehren
+            continue
+
+        stelle = volltext.stelle_von(code, bezeichnung)
+        if stelle is None:
+            offen.append(f"{code} (im Volltext nicht gefunden)")
+            continue
+        if code in HUNDERTSATZ:
+            offen.append(f"{code}: {HUNDERTSATZ[code]} - keine Punktzahl")
+            continue
+        # Zuerst die Sammelueberschrift - sie ist eindeutig; erst danach der
+        # Preis am Eintrag selbst, den die Aufbereitung gelegentlich verliert.
+        punkte = volltext.punktzahl_der_sammelposition(stelle)
+        if punkte is not None:
+            aufnehmen(code, bezeichnung, punkte, "sammel")
+            continue
+        punkte = volltext.punktzahl_am_eintrag(stelle, code)
+        if punkte is not None:
+            aufnehmen(code, bezeichnung, punkte, "direkt")
+            continue
+        offen.append(f"{code} {bezeichnung[:52]}")
+
+    for nummer, bezeichnung, punkte in volltext.fehlende_nummern(gesehen):
+        aufnehmen(nummer, bezeichnung, punkte, "sammel")
+        zaehler["sammel"] -= 1
+        zaehler["nachgetragen"] += 1
 
     eintraege.sort(key=lambda e: (zahl(e["nummer"]) or 0, e["nummer"]))
-    return eintraege, zaehler
+    return eintraege, zaehler, offen
 
 
 def schreibe(eintraege: list[dict], ziel: Path, goae: dict) -> None:
@@ -228,9 +348,10 @@ def schreibe(eintraege: list[dict], ziel: Path, goae: dict) -> None:
 #                              (Abschnitt M und Nummer 437)
 #   regelsatz     Schwellenwert; darueber ist eine Begruendung noetig (§ 12 GOAE)
 #   hoechstsatz   Hoechstsatz der Steigerungsklasse
-#   herkunft      eigen  = Punktzahl steht bei dieser Nummer
-#                 gruppe = Punktzahl gilt im Verzeichnis fuer eine Gruppe von
-#                          Nummern (verbundene Zelle) und wurde uebernommen
+#   herkunft      direkt = Punktzahl steht im Verzeichnis bei dieser Nummer
+#                 sammel = Nummer gehoert zu einer Sammelposition; die Punktzahl
+#                          steht in deren Ueberschrift ("... je Messgroesse 70
+#                          7,98 Katalog 3512 ... 3514 Glukose ...")
 """
     ziel.parent.mkdir(parents=True, exist_ok=True)
     with ziel.open("w", encoding="utf-8", newline="") as datei:
@@ -251,13 +372,18 @@ def main(argv: list[str]) -> int:
     quelle = Path(argv[1])
     ziel = Path(argv[2]) if len(argv) > 2 else \
         Path(__file__).resolve().parent.parent / "daten" / "goae_katalog.csv"
-    goae, zeilen = lies_zeilen(quelle)
-    eintraege, zaehler = baue_eintraege(zeilen)
+    goae, zeilen, anlage = lies_quelle(quelle)
+    eintraege, zaehler, offen = baue_eintraege(zeilen, anlage)
     schreibe(eintraege, ziel, goae)
     print(f"{len(eintraege)} Ziffern geschrieben nach {ziel}")
-    print(f"  davon mit eigener Punktzahl: {zaehler['eigen']}")
-    print(f"  aus Gruppeneintrag uebernommen: {zaehler['gruppe']}")
-    print(f"  ohne zuordenbare Punktzahl uebergangen: {zaehler['verworfen']}")
+    print(f"  Punktzahl im Verzeichnis bei der Nummer selbst: {zaehler['direkt']}")
+    print(f"  Punktzahl aus der Ueberschrift der Sammelposition: {zaehler['sammel']}")
+    print(f"  aus dem Volltext nachgetragen (fehlten in der Aufbereitung): "
+          f"{zaehler['nachgetragen']}")
+    if offen:
+        print(f"  nicht uebernommen, weil keine Punktzahl feststellbar: {len(offen)}")
+        for eintrag in offen:
+            print(f"    {eintrag}")
     return 0
 
 

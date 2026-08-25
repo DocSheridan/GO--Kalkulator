@@ -35,7 +35,7 @@ def main(argv: list[str]) -> int:
             KLASSENKUERZEL.get(l.klasse, "a"),
             int(l.regelsatz * 1000),
             int(l.hoechstsatz * 1000),
-            1 if l.herkunft == "gruppe" else 0,
+            1 if l.herkunft == "sammel" else 0,
         ]
         for l in katalog.alle()
     ]
@@ -46,7 +46,7 @@ def main(argv: list[str]) -> int:
         # Punktwert 0,0582873 EUR als Ganzzahl in Einheiten von 10^-7 EUR.
         "punktwert_e7": 582873,
         "spalten": ["nummer", "bezeichnung", "punktzahl", "abschnitt", "klasse",
-                    "regelsatz", "hoechstsatz", "gruppe"],
+                    "regelsatz", "hoechstsatz", "sammel"],
         "ziffern": ziffern,
     }
     ziel.parent.mkdir(parents=True, exist_ok=True)
