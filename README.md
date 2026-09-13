@@ -357,9 +357,6 @@ erscheinen in der App über das **i** in der Kopfzeile, im Schreibtischprogramm
 unter *Hilfe → Impressum und Urheberrecht*, auf jedem Ausdruck und in jeder
 Excel-Tabelle.
 
-> Das Feld `kontakt` ist noch auszufüllen. Ein Impressum nach § 5 DDG verlangt
-> neben der Anschrift auch eine Kontaktmöglichkeit.
-
 ## Haftungsausschluss
 
 Der Leistungskatalog stammt aus dem amtlichen GOÄ-Text; die Zuordnung der

@@ -10,16 +10,14 @@ export const COPYRIGHT = '© 2026 Raimar Lorrmann';
 export const PRAXIS = 'Die Hausärzte im Sheridan';
 
 /**
- * Das Feld "kontakt" ist noch auszufüllen. Ein Impressum
- * nach § 5 DDG muss ladungsfähige Anschrift, Kontakt sowie für Ärzte die
- * Berufsbezeichnung, die zuständige Kammer und die Aufsichtsbehörde nennen.
- * Erfundene Angaben wären schlimmer als erkennbar offene.
+ * Ein Impressum nach § 5 DDG nennt ladungsfähige Anschrift und Kontakt, für
+ * Ärzte zusätzlich Berufsbezeichnung, zuständige Kammer und Aufsichtsbehörde.
  */
 export const IMPRESSUM = {
   verantwortlich: 'Raimar Lorrmann',
   praxis: PRAXIS,
   anschrift: 'Max-Josef-Metzger-Straße 3a, 86157 Augsburg',
-  kontakt: '…',
+  kontakt: 'praxis@hausaerzte-sheridan.de',
   berufsbezeichnung: 'Arzt (verliehen in der Bundesrepublik Deutschland)',
   kammer: 'Bayerische Landesärztekammer',
   aufsicht: 'Bayerische Landesärztekammer',

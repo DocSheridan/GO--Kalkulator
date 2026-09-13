@@ -6,15 +6,13 @@ uebereinstimmen, pruefen die Testfaelle.
 
 COPYRIGHT = "© 2026 Raimar Lorrmann"
 
-# Das Feld "kontakt" ist noch auszufuellen. Ein Impressum
-# nach § 5 DDG muss ladungsfaehige Anschrift, Kontakt sowie fuer Aerzte die
-# Berufsbezeichnung, die zustaendige Kammer und die Aufsichtsbehoerde nennen.
-# Erfundene Angaben waeren schlimmer als erkennbar offene.
+# Ein Impressum nach § 5 DDG nennt ladungsfaehige Anschrift und Kontakt, fuer
+# Aerzte zusaetzlich Berufsbezeichnung, zustaendige Kammer und Aufsichtsbehoerde.
 IMPRESSUM = {
     "verantwortlich": "Raimar Lorrmann",
     "praxis": "Die Hausärzte im Sheridan",
     "anschrift": "Max-Josef-Metzger-Straße 3a, 86157 Augsburg",
-    "kontakt": "…",
+    "kontakt": "praxis@hausaerzte-sheridan.de",
     "berufsbezeichnung": "Arzt (verliehen in der Bundesrepublik Deutschland)",
     "kammer": "Bayerische Landesärztekammer",
     "aufsicht": "Bayerische Landesärztekammer",
