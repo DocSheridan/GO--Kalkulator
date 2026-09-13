@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from goae_kalkulator import farben
+from goae_kalkulator import angaben, farben
 from goae_kalkulator.cli import betrag, main, zerlege_ziffer, Abbruch
 from goae_kalkulator.eigene import EigeneFehler, EigeneZiffern, katalog_mit_eigenen
 from goae_kalkulator.excel import exportiere
@@ -704,6 +704,30 @@ class TestFarbschema(unittest.TestCase):
         self.assertIn(farben.excel(farben.GRUEN), stile)
         self.assertIn(farben.excel(farben.GRUEN_TON), stile)
         self.assertNotIn("FF1F4E79", stile, "alter Blauton noch enthalten")
+
+
+class TestAngaben(unittest.TestCase):
+    """Urheberrecht und Impressum - in Programm und App wortgleich."""
+
+    WURZEL = Path(__file__).resolve().parent.parent
+
+    def test_impressum_stimmt_in_beiden_fassungen_ueberein(self):
+        quelle = (self.WURZEL / "app" / "js" / "angaben.js").read_text(encoding="utf-8")
+        aus_js = dict(re.findall(r"^  (\w+): '(.*?)',$", quelle, re.M))
+        aus_js["praxis"] = re.search(r"export const PRAXIS = '(.*?)'", quelle).group(1)
+        self.assertEqual(angaben.IMPRESSUM, aus_js)
+        self.assertEqual(angaben.COPYRIGHT,
+                         re.search(r"export const COPYRIGHT = '(.*?)'", quelle).group(1))
+
+    def test_urheberrechtsvermerk_steht_auf_der_tabelle(self):
+        angebot = Angebot(name="Vermerk")
+        angebot.hinzufuegen(Position.aus_leistung(leistung()))
+        with tempfile.TemporaryDirectory() as ordner:
+            pfad = exportiere(angebot, Path(ordner) / "vermerk.xlsx")
+            with zipfile.ZipFile(pfad) as archiv:
+                blatt = archiv.read("xl/worksheets/sheet1.xml").decode()
+        self.assertIn("Raimar Lorrmann", blatt)
+        self.assertIn(angaben.IMPRESSUM["praxis"], blatt)
 
 
 class TestKommandozeile(unittest.TestCase):

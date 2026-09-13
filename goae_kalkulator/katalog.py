@@ -13,7 +13,7 @@ from .modelle import KLASSEN, Leistung
 STANDARD_KATALOG = Path(__file__).resolve().parent.parent / "daten" / "goae_katalog.csv"
 
 SPALTEN = ("nummer", "bezeichnung", "punktzahl", "abschnitt", "klasse",
-           "regelsatz", "hoechstsatz", "herkunft")
+           "regelsatz", "hoechstsatz", "herkunft", "hoechstwert")
 
 
 class KatalogFehler(Exception):
@@ -93,6 +93,7 @@ class Katalog:
                     hoechstsatz=_dezimal(daten.get("hoechstsatz", ""), str(hoechst_std)),
                     herkunft=(daten.get("herkunft") or "direkt").lower(),
                     analog_zu=daten.get("analog_zu", ""),
+                    hoechstwert=daten.get("hoechstwert", ""),
                 )
             )
         if not leistungen:
@@ -149,7 +150,7 @@ class Katalog:
             for l in self.alle():
                 schreiber.writerow(
                     [l.nummer, l.bezeichnung, l.punktzahl, l.abschnitt, l.klasse,
-                     l.regelsatz, l.hoechstsatz, l.herkunft]
+                     l.regelsatz, l.hoechstsatz, l.herkunft, l.hoechstwert]
                 )
         return pfad
 

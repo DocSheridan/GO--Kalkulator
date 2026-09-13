@@ -10,7 +10,7 @@ oder man gibt den **gewünschten Gesamtpreis** vor und das Programm verteilt die
 Faktoren automatisch so, dass die Summe erreicht wird. Kein Faktor wird dabei
 kleiner als 1,0 oder größer als 3,5.
 
-Mitgeliefert ist das **vollständige amtliche Gebührenverzeichnis** mit 2.790
+Mitgeliefert ist das **vollständige amtliche Gebührenverzeichnis** mit 2.830
 GOÄ-Nummern. Das Programm braucht **nur Python 3.10 oder neuer** – keine
 weiteren Pakete, auch nicht für den Excel-Export.
 
@@ -111,7 +111,7 @@ Summen; werden mehrere Angebote exportiert, kommt ein Übersichtsblatt hinzu.
 ## Leistungskatalog
 
 Mitgeliefert ist das **vollständige amtliche Gebührenverzeichnis der GOÄ** mit
-2.790 Nummern von 1 (Beratung) bis 6018 (Sektionsleistungen).
+2.830 Nummern von 1 (Beratung) bis 6018 (Sektionsleistungen).
 
 | | |
 |---|---|
@@ -163,9 +163,20 @@ Untersuchung folgender Meßgrößen ..., je Meßgröße        70   7,98
 Katalog   3512 Alpha-Amylase   3513 Gamma-GT   3514 Glukose   ...
 ```
 
-503 der 2.790 Nummern gehören zu einer solchen Sammelposition. Sie tragen in der
+478 der 2.830 Nummern gehören zu einer solchen Sammelposition. Sie tragen in der
 Spalte `herkunft` den Wert `sammel`, sind in der Katalogliste mit `*` markiert
 und erhalten in der Position einen Hinweis.
+
+### Höchstwerte im Labor
+
+Viele Laborziffern sind im Verzeichnis einem **Höchstwert** zugeordnet, erkennbar
+an einem Zusatz an der Nummer: `3562.H1 Cholesterin` gehört zum Höchstwert nach
+Nummer 3541.H. Die Zuordnung steht in der Spalte `hoechstwert` und erscheint in
+der Katalogliste als `HW 3541.H`.
+
+Der Höchstwert selbst wird vom Programm **nicht durchgesetzt** — es rechnet
+Beträge, es prüft keine Abrechnungsregeln. Der Hinweis soll nur daran erinnern,
+dass die Summe der so gekennzeichneten Leistungen gedeckelt ist.
 
 ### Was nicht im Katalog steht
 
@@ -175,10 +186,9 @@ nach dem Verzeichnis als Hundertsatz der Bezugsleistung berechnet — 100 bzw.
 Punktzahl. Sie sind bewusst nicht enthalten, statt sie mit einem erfundenen Wert
 zu führen.
 
-Ebenfalls nicht abgebildet sind die Höchstwert-Regeln des Labors (im Text durch
-Zusätze wie `.H1` an der Nummer gekennzeichnet) und die übrigen Allgemeinen
-Bestimmungen zu Ausschlüssen und Kombinationen. Das Programm rechnet Beträge,
-es prüft keine Abrechnungsregeln.
+Nicht abgebildet sind die Allgemeinen Bestimmungen zu Ausschlüssen und
+Kombinationen — welche Ziffern nebeneinander berechnungsfähig sind, prüft das
+Programm nicht.
 
 ### Prüfung der Punktzahlen
 
@@ -299,7 +309,7 @@ goae_kalkulator/
   gui.py                      Fenster-Oberfläche (tkinter)
   konsole.py                  menügeführte Bedienung
   cli.py                      Kommandozeile
-daten/goae_katalog.csv        Leistungskatalog (2.790 GOÄ-Nummern)
+daten/goae_katalog.csv        Leistungskatalog (2.830 GOÄ-Nummern)
 werkzeuge/
   katalog_erzeugen.py         Katalog aus dem amtlichen GOÄ-Text erzeugen
   katalog_fuer_app.py         Katalog für die Smartphone-App aufbereiten
@@ -334,6 +344,21 @@ cd app && node --test                # App-Tests inklusive Abgleich
 python3 -m unittest discover -s tests -v   # Schreibtischprogramm, 68 Fälle
 cd app && node --test                      # Smartphone-App, 18 Fälle
 ```
+
+## Ausdruck und Impressum
+
+Die App erzeugt über *Drucken / PDF* ein Angebotsblatt: Ziffern, Faktoren,
+Beträge, die Hinweise nach § 5 und § 12 GOÄ sowie den Urheberrechtsvermerk. Über
+die Druckfunktion des Browsers wird daraus eine PDF-Datei.
+
+Impressum und Urheberrecht stehen in `goae_kalkulator/angaben.py` und —
+wortgleich, durch einen Testfall abgesichert — in `app/js/angaben.js`. Sie
+erscheinen in der App über das **i** in der Kopfzeile, im Schreibtischprogramm
+unter *Hilfe → Impressum und Urheberrecht*, auf jedem Ausdruck und in jeder
+Excel-Tabelle.
+
+> Das Feld `kontakt` ist noch auszufüllen. Ein Impressum nach § 5 DDG verlangt
+> neben der Anschrift auch eine Kontaktmöglichkeit.
 
 ## Haftungsausschluss
 

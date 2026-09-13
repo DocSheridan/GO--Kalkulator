@@ -121,7 +121,8 @@ def katalog_tabelle(leistungen, grenze: int | None = None) -> str:
         [l.nummer, l.bezeichnung[:52], str(l.punktzahl),
          geld(l.einfachsatz), geld(l.satz_2_3), geld(l.satz_3_5),
          (f"analog {l.analog_zu}" if l.herkunft == "analog"
-          else f"{l.abschnitt} / {l.klasse}" + (" *" if l.herkunft == "sammel" else ""))]
+          else f"{l.abschnitt} / {l.klasse}" + (" *" if l.herkunft == "sammel" else "")
+          + (f" [HW {l.hoechstwert}]" if l.hoechstwert else ""))]
         for l in gekuerzt
     ]
     text = tabelle(

@@ -87,6 +87,8 @@ export class Position {
     this.herkunft = daten.herkunft ?? 'direkt';
     // Bei Analogziffern die herangezogene Nummer des Gebührenverzeichnisses.
     this.analogZu = daten.analogZu ?? '';
+    // Nummer des Höchstwerts, dem die Leistung zugeordnet ist.
+    this.hoechstwert = daten.hoechstwert ?? '';
   }
 
   static ausLeistung(leistung, anzahl = 1, faktor = null) {
@@ -102,6 +104,7 @@ export class Position {
       hoechstsatz: leistung.hoechstsatz,
       herkunft: leistung.herkunft,
       analogZu: leistung.analogZu,
+      hoechstwert: leistung.hoechstwert,
     });
   }
 
@@ -137,6 +140,9 @@ export class Position {
     if (this.herkunft === 'sammel') {
       return 'Punktzahl stammt aus der Überschrift einer Sammelposition';
     }
+    if (this.hoechstwert) {
+      return `Höchstwert nach Nr. ${this.hoechstwert} beachten`;
+    }
     return '';
   }
 
@@ -146,7 +152,7 @@ export class Position {
       anzahl: this.anzahl, faktor: this.faktor, fixiert: this.fixiert,
       abschnitt: this.abschnitt, klasse: this.klasse, regelsatz: this.regelsatz,
       hoechstsatz: this.hoechstsatz, begruendung: this.begruendung,
-      herkunft: this.herkunft, analogZu: this.analogZu,
+      herkunft: this.herkunft, analogZu: this.analogZu, hoechstwert: this.hoechstwert,
     };
   }
 }

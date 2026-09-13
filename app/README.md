@@ -120,6 +120,18 @@ anzupassen und das Skript erneut laufen zu lassen. Nach jeder Symboländerung
 ist die Version in `sw.js` zu erhöhen – sonst zeigen bereits installierte
 Geräte weiter das alte Symbol aus ihrem Zwischenspeicher.
 
+## Ausdruck als PDF
+
+*Drucken / PDF* im Angebotsbereich erzeugt ein sauberes Angebotsblatt —
+Bedienelemente verschwinden, es bleiben Ziffern, Faktoren, Beträge, die Hinweise
+nach § 5 und § 12 GOÄ sowie der Urheberrechtsvermerk. Über die Druckfunktion des
+Telefons wird daraus eine PDF-Datei („Als PDF sichern"), die sich teilen lässt.
+
+## Impressum
+
+Das **i** in der Kopfzeile öffnet das Impressum mit Anschrift, Kammer und
+Urheberrecht. Die Angaben stehen in `js/angaben.js`.
+
 ## Wo die Daten liegen
 
 Angebote und Patientenangaben werden **ausschließlich auf dem Gerät**
@@ -171,7 +183,7 @@ app/
   js/speicher.js             Ablage auf dem Gerät
   js/xlsx.js                 Excel-Ausgabe ohne Fremdbibliothek
   js/app.js                  Bedienung
-  daten/goae_katalog.json    2 790 GOÄ-Ziffern (aus daten/goae_katalog.csv)
+  daten/goae_katalog.json    2 830 GOÄ-Ziffern (aus daten/goae_katalog.csv)
   symbole/                   App-Symbole
   tests/                     Testfälle und Prüfvektoren
 ```

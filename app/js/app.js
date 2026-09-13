@@ -4,6 +4,7 @@ import {
   Angebot, MAX_FAKTOR, MIN_FAKTOR, Position,
   betragAusText, faktorAusText, faktorText, geld,
 } from './modelle.js';
+import { COPYRIGHT, IMPRESSUM } from './angaben.js';
 import { Katalog } from './katalog.js';
 import { EigeneFehler, EigeneZiffern, katalogMitEigenen } from './eigene.js';
 import { Angebotsverzeichnis } from './speicher.js';
@@ -11,6 +12,7 @@ import { STRATEGIEN, STRATEGIE_TEXT, optimiereFaktoren } from './zielbetrag.js';
 import { angebotAlsXlsx, dateiname } from './xlsx.js';
 
 const $ = (auswahl) => document.querySelector(auswahl);
+
 const verzeichnis = new Angebotsverzeichnis();
 const eigene = new EigeneZiffern();
 
@@ -62,7 +64,7 @@ function wechsle(ziel) {
   // Uebernehmen sichtbar mit, in der Ablage hat sie nichts zu suchen.
   $('#summenleiste').hidden = ziel === 'gespeichert';
   if (ziel === 'gespeichert') zeigeGespeicherte();
-  if (ziel === 'katalog') setTimeout(() => $('#feld-suche').focus(), 60);
+  if (ziel === 'katalog') { zeichneKatalog(); setTimeout(() => $('#feld-suche').focus(), 60); }
   window.scrollTo({ top: 0 });
 }
 
@@ -231,6 +233,9 @@ function geaendert({ sichern = false } = {}) {
   zeichnePositionen();
   zeichneSummen();
   zeichneKopf();
+  // Der Katalog graut übernommene Ziffern aus - nur neu zeichnen, wenn er
+  // sichtbar ist, damit jeder Tipp auf einen Faktor nicht die Liste neu baut.
+  if (!$('#ansicht-katalog').hidden) zeichneKatalog();
 }
 
 function setzeFaktor(index, milli) {
@@ -256,21 +261,33 @@ function zeichneKatalog() {
     : `${katalog.anzahl} Ziffern im Katalog – bitte suchen`;
   $('#knopf-mehr').hidden = gesamt <= liste.length;
 
+  // Wie oft steht jede Ziffer schon im Angebot?
+  const imAngebot = new Map();
+  for (const p of angebot.positionen) {
+    imAngebot.set(p.nummer, (imAngebot.get(p.nummer) ?? 0) + 1);
+  }
+
   const behaelter = $('#katalogliste');
   behaelter.textContent = '';
   for (const l of liste) {
+    const schon = imAngebot.get(l.nummer) ?? 0;
     const knopf = document.createElement('button');
     knopf.type = 'button';
-    knopf.className = 'katalogeintrag';
+    knopf.className = 'katalogeintrag' + (schon ? ' uebernommen' : '');
     knopf.innerHTML = `<span class="ziffer">${maskiere(l.nummer)}</span>`
       + `<span class="katalog-text"><span class="legende">${maskiere(l.bezeichnung)}</span>`
       + `<span class="katalog-saetze">${geld(betragFuer(l, 1000))} · ${geld(betragFuer(l, 2300))} · ${geld(betragFuer(l, 3500))} €`
       + (l.herkunft === 'analog'
         ? `  <span class="analog-marke">eigene Ziffer, analog ${maskiere(l.analogZu)}</span>`
-        : `  <span class="klasse">${l.abschnitt} / ${l.klassenname}${l.herkunft === 'sammel' ? ' *' : ''}</span>`)
+        : `  <span class="klasse">${l.abschnitt} / ${l.klassenname}${l.herkunft === 'sammel' ? ' *' : ''}${l.hoechstwert ? ` · HW ${l.hoechstwert}` : ''}</span>`)
+      + (schon ? `  <span class="katalog-anzahl">${schon}× im Angebot</span>` : '')
       + '</span></span>'
-      + '<span class="katalog-plus" aria-hidden="true">+</span>';
-    knopf.setAttribute('aria-label', `Ziffer ${l.nummer} übernehmen`);
+      + (schon
+        ? `<span class="katalog-plus" aria-hidden="true">✓</span>`
+        : '<span class="katalog-plus" aria-hidden="true">+</span>');
+    knopf.setAttribute('aria-label', schon
+      ? `Ziffer ${l.nummer} ist ${schon}× im Angebot – erneut übernehmen`
+      : `Ziffer ${l.nummer} übernehmen`);
     knopf.addEventListener('click', () => uebernehmen(l));
     behaelter.append(knopf);
   }
@@ -551,6 +568,8 @@ function verdrahte() {
   $('#knopf-neu').addEventListener('click', neuesAngebot);
   $('#knopf-neu-2').addEventListener('click', neuesAngebot);
   $('#knopf-hilfe').addEventListener('click', zeigeHilfe);
+  $('#knopf-impressum').addEventListener('click', zeigeImpressum);
+  $('#knopf-drucken').addEventListener('click', drucken);
 
   let uhr = null;
   $('#feld-suche').addEventListener('input', () => {
@@ -569,6 +588,77 @@ function verdrahte() {
   window.addEventListener('beforeunload', (e) => {
     if (!gesichert && angebot.positionen.length) { e.preventDefault(); e.returnValue = ''; }
   });
+}
+
+function zeigeImpressum() {
+  const feld = $('#impressum-inhalt');
+  const zeile = (wert) => (wert === '…'
+    ? '<span class="platzhalter">noch einzutragen</span>' : maskiere(wert));
+  feld.innerHTML = `
+    <h3>Verantwortlich</h3>
+    <p>${zeile(IMPRESSUM.verantwortlich)}<br>${zeile(IMPRESSUM.praxis)}</p>
+    <h3>Anschrift</h3><p>${zeile(IMPRESSUM.anschrift)}</p>
+    <h3>Kontakt</h3><p>${zeile(IMPRESSUM.kontakt)}</p>
+    <h3>Berufsbezeichnung</h3><p>${zeile(IMPRESSUM.berufsbezeichnung)}</p>
+    <h3>Zuständige Kammer</h3><p>${zeile(IMPRESSUM.kammer)}</p>
+    <h3>Aufsichtsbehörde</h3><p>${zeile(IMPRESSUM.aufsicht)}</p>
+    <h3>Urheberrecht</h3>
+    <p>${maskiere(COPYRIGHT)}. Alle Rechte vorbehalten.</p>
+    <h3>Berechnungsgrundlage</h3>
+    <p>Gebührenordnung für Ärzte (GOÄ), amtliche Fassung.
+       Die Kalkulation ersetzt keine abrechnungsrechtliche Prüfung; Angaben ohne Gewähr.</p>`;
+  $('#impressum-dialog').showModal();
+}
+
+/** Baut das Blatt, das der Browser druckt oder als PDF sichert. */
+function fuelleDruckblatt() {
+  const zeilen = angebot.positionen.map((p) => `
+    <tr>
+      <td>${maskiere(p.nummer)}</td>
+      <td>${maskiere(p.leistungstext)}${p.begruendung
+        ? `<br><small>${maskiere(p.begruendung)}</small>` : ''}</td>
+      <td class="zahl">${p.anzahl}</td>
+      <td class="zahl">${faktorText(p.faktor)}</td>
+      <td class="zahl">${geld(p.betrag)} €</td>
+    </tr>`).join('');
+
+  const kopfzeilen = [
+    angebot.patient && `Patient/in: ${angebot.patient}`,
+    angebot.beschreibung,
+    `Stand: ${new Date().toLocaleDateString('de-DE')}`,
+  ].filter(Boolean).map(maskiere).join(' · ');
+
+  $('#druckblatt').innerHTML = `
+    <h1>${maskiere(angebot.name || 'Kostenvoranschlag')}</h1>
+    <p class="unterzeile">Kostenvoranschlag nach der Gebührenordnung für Ärzte (GOÄ)
+      <br>${kopfzeilen}</p>
+    <table>
+      <thead><tr>
+        <th>Ziffer</th><th>Leistung</th>
+        <th class="zahl">Anz.</th><th class="zahl">Faktor</th><th class="zahl">Betrag</th>
+      </tr></thead>
+      <tbody>${zeilen}</tbody>
+      <tfoot><tr>
+        <td colspan="4">Gesamtbetrag</td>
+        <td class="zahl">${geld(angebot.summe)} €</td>
+      </tr></tfoot>
+    </table>
+    <p class="anmerkung">
+      Berechnung nach § 5 GOÄ: Punktzahl × Punktwert (0,0582873 €) × Steigerungsfaktor.
+      Faktoren oberhalb des Regelsatzes sind nach § 12 Abs. 2 GOÄ schriftlich zu begründen.
+      Dies ist ein unverbindlicher Kostenvoranschlag; maßgeblich ist die tatsächlich
+      erbrachte Leistung. Angaben ohne Gewähr.
+    </p>
+    <p class="fuss">${maskiere(IMPRESSUM.praxis)} · ${maskiere(COPYRIGHT)}</p>`;
+}
+
+function drucken() {
+  if (angebot.positionen.length === 0) {
+    melde('Das Angebot enthält keine Positionen.');
+    return;
+  }
+  fuelleDruckblatt();
+  window.print();
 }
 
 function zeigeHilfe() {

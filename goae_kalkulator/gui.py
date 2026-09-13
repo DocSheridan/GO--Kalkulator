@@ -12,7 +12,7 @@ try:
 except ImportError:  # pragma: no cover - nur ohne installiertes tkinter
     tk = None
 
-from . import farben
+from . import angaben, farben
 from .cli import betrag
 from .eigene import EigeneFehler, EigeneZiffern, katalog_mit_eigenen
 from .excel import exportiere
@@ -118,6 +118,7 @@ class Anwendung(tk.Tk):
 
         hilfe = tk.Menu(leiste, tearoff=0)
         hilfe.add_command(label="Kurzanleitung", command=self.hilfe)
+        hilfe.add_command(label="Impressum und Urheberrecht", command=self.impressum)
         leiste.add_cascade(label="Hilfe", menu=hilfe)
         self.config(menu=leiste)
 
@@ -787,6 +788,24 @@ class Anwendung(tk.Tk):
             ".xlsx-Datei.\n\n"
             "Faktoren oberhalb des Regelsatzes sind nach § 12 GOAE schriftlich zu begruenden; "
             "solche Zeilen werden farblich hervorgehoben.",
+            parent=self)
+
+    def impressum(self) -> None:
+        offen = "noch einzutragen"
+        werte = {k: (offen if v == "…" else v) for k, v in angaben.IMPRESSUM.items()}
+        messagebox.showinfo(
+            "Impressum",
+            f"Verantwortlich: {werte['verantwortlich']}\n"
+            f"{werte['praxis']}\n\n"
+            f"Anschrift: {werte['anschrift']}\n"
+            f"Kontakt: {werte['kontakt']}\n"
+            f"Berufsbezeichnung: {werte['berufsbezeichnung']}\n"
+            f"Zuständige Kammer: {werte['kammer']}\n"
+            f"Aufsichtsbehörde: {werte['aufsicht']}\n\n"
+            f"{angaben.COPYRIGHT}. Alle Rechte vorbehalten.\n\n"
+            "Berechnungsgrundlage: Gebührenordnung für Ärzte (GOÄ), amtliche Fassung. "
+            "Die Kalkulation ersetzt keine abrechnungsrechtliche Prüfung; "
+            "Angaben ohne Gewähr.",
             parent=self)
 
     def beenden(self) -> None:

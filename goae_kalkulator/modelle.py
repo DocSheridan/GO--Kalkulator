@@ -84,6 +84,8 @@ class Leistung:
     herkunft: str = "direkt"
     # Bei Analogziffern die herangezogene Nummer des Gebuehrenverzeichnisses.
     analog_zu: str = ""
+    # Nummer des Hoechstwerts, dem die Leistung zugeordnet ist (§ ... Abschnitt M).
+    hoechstwert: str = ""
 
     @property
     def einfachsatz(self) -> Decimal:
@@ -118,6 +120,7 @@ class Position:
     begruendung: str = ""
     herkunft: str = "direkt"
     analog_zu: str = ""
+    hoechstwert: str = ""
 
     def __post_init__(self) -> None:
         self.faktor = faktor(self.faktor)
@@ -187,6 +190,8 @@ class Position:
             return "Begruendung erforderlich (> Regelsatz)"
         if self.herkunft == "sammel":
             return "Punktzahl stammt aus der Ueberschrift einer Sammelposition"
+        if self.hoechstwert:
+            return f"Hoechstwert nach Nr. {self.hoechstwert} beachten"
         return ""
 
     # -- Serialisierung ---------------------------------------------------
@@ -205,6 +210,7 @@ class Position:
             "begruendung": self.begruendung,
             "herkunft": self.herkunft,
             "analog_zu": self.analog_zu,
+            "hoechstwert": self.hoechstwert,
         }
 
     @classmethod
@@ -223,6 +229,7 @@ class Position:
             begruendung=daten.get("begruendung", ""),
             herkunft=daten.get("herkunft", "direkt"),
             analog_zu=daten.get("analog_zu", ""),
+            hoechstwert=daten.get("hoechstwert", ""),
         )
 
     @classmethod
@@ -241,6 +248,7 @@ class Position:
             hoechstsatz=leistung.hoechstsatz,
             herkunft=leistung.herkunft,
             analog_zu=leistung.analog_zu,
+            hoechstwert=leistung.hoechstwert,
         )
 
 

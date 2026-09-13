@@ -333,14 +333,34 @@ main { padding: 12px 12px 0; max-width: 760px; margin: 0 auto; }
   margin-top: 2px;
 }
 .katalog-saetze .klasse { color: var(--marke); }
+
+/* Ziffern, die schon im Angebot stehen - weiter antippbar, aber
+   zurueckgenommen, damit beim Durchsehen sofort auffaellt, was fehlt. */
+.katalogeintrag.uebernommen { opacity: .55; }
+.katalogeintrag.uebernommen .ziffer { color: var(--text-leise); }
+.katalogeintrag.uebernommen .katalog-plus {
+  border-color: var(--text-leise);
+  color: var(--text-leise);
+  font-size: 1.15rem;
+}
+.katalog-anzahl {
+  font-weight: 600;
+  color: var(--text-leise);
+}
 .katalog-plus {
   flex: none;
-  width: 36px; height: 36px;
+  /* Flex statt line-height: das Pluszeichen sitzt sonst nicht mittig im Kreis. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px; height: 40px;
+  padding: 0;
   border-radius: 50%;
-  border: 1px solid var(--marke);
+  border: 1.5px solid var(--marke);
   background: transparent;
   color: var(--marke);
-  font-size: 1.3rem; line-height: 1;
+  font-size: 1.7rem;
+  line-height: 1;
 }
 
 /* --------------------------------------------------------- Gespeichert */
@@ -460,4 +480,37 @@ main { padding: 12px 12px 0; max-width: 760px; margin: 0 auto; }
 @media (min-width: 620px) {
   .positionen { display: grid; grid-template-columns: 1fr 1fr; }
   .summen-vergleich { gap: 18px; font-size: .8rem; }
+}
+
+/* ------------------------------------------------------------- Impressum */
+.impressum { font-size: .84rem; line-height: 1.5; }
+.impressum h3 { margin: 12px 0 2px; font-size: .8rem; text-transform: uppercase;
+                letter-spacing: .3px; color: var(--text-leise); }
+.impressum p { margin: 0 0 4px; color: var(--text); }
+.impressum .platzhalter { color: var(--warnung); }
+
+/* ------------------------------------------------------------- Ausdruck */
+.druckblatt { display: none; }
+
+@media print {
+  /* Auf Papier bleibt nur das Angebot - Bedienelemente haben dort nichts
+     verloren, und der Browser erzeugt daraus die PDF-Datei. */
+  body { padding: 0; background: #fff; color: #000; }
+  .kopf, main, .summenleiste, .reiter, .hinweisfeld { display: none !important; }
+  .druckblatt { display: block; padding: 0; font-size: 11pt; color: #000; }
+  .druckblatt h1 { margin: 0 0 2mm; font-size: 16pt; }
+  .druckblatt .unterzeile { margin: 0 0 6mm; font-size: 10pt; color: #333; }
+  .druckblatt table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+  .druckblatt th {
+    text-align: left; padding: 2mm 1.5mm; border-bottom: .4mm solid #000;
+    font-size: 9pt; text-transform: uppercase; letter-spacing: .3px;
+  }
+  .druckblatt td { padding: 1.6mm 1.5mm; border-bottom: .1mm solid #bbb; vertical-align: top; }
+  .druckblatt .zahl { text-align: right; white-space: nowrap; }
+  .druckblatt tfoot td { border-top: .4mm solid #000; border-bottom: none;
+                         font-weight: 700; padding-top: 2.5mm; }
+  .druckblatt .anmerkung { margin-top: 6mm; font-size: 8.5pt; color: #333; }
+  .druckblatt .fuss { margin-top: 4mm; font-size: 8pt; color: #555; }
+  tr { page-break-inside: avoid; }
+  @page { margin: 18mm 15mm; }
 }

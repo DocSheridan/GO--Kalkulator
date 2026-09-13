@@ -23,6 +23,7 @@
     <p id="kopf-unterzeile">Katalog wird geladen …</p>
   </div>
   <button type="button" id="knopf-hilfe" class="kopf-knopf" aria-label="Hilfe">?</button>
+  <button type="button" id="knopf-impressum" class="kopf-knopf" aria-label="Impressum">i</button>
 </header>
 
 <main>
@@ -97,6 +98,7 @@
       <div class="knopfreihe">
         <button type="button" id="knopf-speichern" class="knopf haupt">Speichern</button>
         <button type="button" id="knopf-excel" class="knopf">Excel</button>
+        <button type="button" id="knopf-drucken" class="knopf">Drucken / PDF</button>
         <button type="button" id="knopf-neu" class="knopf">Neues Angebot</button>
       </div>
     </section>
@@ -177,6 +179,18 @@
 </nav>
 
 <div id="hinweisfeld" class="hinweisfeld" role="status" aria-live="polite" hidden></div>
+
+<div id="druckblatt" class="druckblatt" aria-hidden="true"></div>
+
+<dialog id="impressum-dialog" class="dialog">
+  <form method="dialog">
+    <h2>Impressum</h2>
+    <div id="impressum-inhalt" class="impressum"></div>
+    <div class="knopfreihe">
+      <button type="submit" value="ok" class="knopf haupt">Schließen</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="analog-dialog" class="dialog">
   <form method="dialog">

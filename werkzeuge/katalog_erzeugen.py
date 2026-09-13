@@ -112,7 +112,20 @@ KLASSE_LABOR = ("labor", "1.15", "1.3")          # § 5 Abs. 4 (Abschnitt M, Nr.
 SAMMEL_MUSTER = re.compile(r"(\d{1,5})\s+[\d.]+[.,](?:\d{2}|--)\s+Katalog\s*$")
 
 # Innerhalb eines Sammelblocks: "<Nummer>[.H4] <Bezeichnung>"
-BLOCK_EINTRAG = re.compile(r"(?<![\w.])(\d{3,4})(?:\.[A-Z]\d?)?\s+(?=[A-ZÄÖÜ])")
+BLOCK_EINTRAG = re.compile(r"(?<![\w.])(\d{3,4})(?:\.(H\d?))?\s+(?=[A-ZÄÖÜ])")
+
+# Eintrag mit Hoechstwert-Kennzeichen an der Nummer und eigenem Preis:
+#   "3562.H1 Cholesterin 40 4,56"
+# Die Tabellenaufbereitung des Pakets verliert alle Nummern mit Zusatz.
+MIT_KENNZEICHEN = re.compile(
+    r"(?<![\w.])(\d{3,4})\.(H\d?)\s+([A-ZÄÖÜ].{2,190}?)\s+(\d{1,5})\s+"
+    r"[\d.]+[.,](?:\d{2}|--)(?=\s)")
+
+# "Fuer die mit H1 gekennzeichneten Untersuchungen ist der Hoechstwert nach
+# Nummer 3541.H zu beachten."
+KENNZEICHEN_ZUORDNUNG = re.compile(
+    r"mit (H\d?) gekennzeichneten Untersuchungen ist der Höchstwert "
+    r"nach Nummer ([\d.H]+)")
 
 # Ende eines Sammelblocks: die naechste Ueberschrift mit Punktzahl und Betrag.
 BLOCK_ENDE = re.compile(r"\d{1,5}\s+[\d.]+[.,](?:\d{2}|--)")
@@ -228,13 +241,32 @@ class Volltext:
         treffer = SAMMEL_MUSTER.search(davor[:anker + len("Katalog")])
         return int(treffer.group(1)) if treffer else None
 
-    def fehlende_nummern(self, bekannt: set[str]) -> list[tuple[str, str, int]]:
+    def hoechstwerte(self) -> dict[str, str]:
+        """Ordnet jedem Kennzeichen die Nummer seines Hoechstwerts zu."""
+        return {m.group(1): m.group(2) for m in KENNZEICHEN_ZUORDNUNG.finditer(self.text)}
+
+    def fehlende_mit_preis(self, bekannt: set[str]) -> list[tuple[str, str, int, str]]:
+        """Eintraege, deren Nummer ein Hoechstwert-Kennzeichen traegt.
+
+        Sie stehen mit eigener Punktzahl im Verzeichnis (3562.H1 Cholesterin
+        40 4,56), fehlen in der Tabellenaufbereitung aber vollstaendig - und
+        damit zentrale Laborziffern wie Cholesterin, Kreatinin oder GOT.
+        """
+        gefunden: dict[str, tuple[str, int, str]] = {}
+        for m in MIT_KENNZEICHEN.finditer(self.text):
+            nummer = m.group(1)
+            if nummer in bekannt or nummer in gefunden:
+                continue
+            gefunden[nummer] = (saeubere(m.group(3)), int(m.group(4)), m.group(2))
+        return [(nr, bez, p, kz) for nr, (bez, p, kz) in sorted(gefunden.items())]
+
+    def fehlende_nummern(self, bekannt: set[str]) -> list[tuple[str, str, int, str]]:
         """Nummern in Sammelbloecken, die in der Tabellenaufbereitung fehlen.
 
         Das Paket streicht den Hoechstwert-Zusatz (4022.H4 -> 4022) und verliert
         dabei einige Eintraege ganz - hier werden sie nachgetragen.
         """
-        gefunden: dict[str, tuple[str, int]] = {}
+        gefunden: dict[str, tuple[str, int, str]] = {}
         for anker in re.finditer(r"\bKatalog\b", self.text):
             rest = self.text[anker.end():anker.end() + 4000]
             # Punktzahl der Ueberschrift genau dieses Blocks.
@@ -252,18 +284,20 @@ class Volltext:
                 bis = stellen[i + 1].start() if i + 1 < len(stellen) else len(block)
                 bezeichnung = saeubere(block[m.end():bis])
                 if bezeichnung:
-                    gefunden[nummer] = (bezeichnung, punkte)
-        return [(nr, bez, p) for nr, (bez, p) in sorted(gefunden.items())]
+                    gefunden[nummer] = (bezeichnung, punkte, m.group(2) or "")
+        return [(nr, bez, p, kz) for nr, (bez, p, kz) in sorted(gefunden.items())]
 
 
 def baue_eintraege(zeilen: list[dict], anlage: str) -> tuple[list[dict], dict, list[str]]:
     volltext = Volltext(anlage)
+    zuordnung = volltext.hoechstwerte()
     eintraege: list[dict] = []
     gesehen: set[str] = set()
     zaehler = {"direkt": 0, "sammel": 0, "nachgetragen": 0}
     offen: list[str] = []
 
-    def aufnehmen(code: str, bezeichnung: str, punktzahl: int, herkunft: str) -> None:
+    def aufnehmen(code: str, bezeichnung: str, punktzahl: int, herkunft: str,
+                  kennzeichen: str = "") -> None:
         abschnitt, _titel = abschnitt_fuer(code)
         klasse, regelsatz, hoechstsatz = klasse_fuer(code, abschnitt)
         gesehen.add(code)
@@ -273,6 +307,8 @@ def baue_eintraege(zeilen: list[dict], anlage: str) -> tuple[list[dict], dict, l
             "abschnitt": abschnitt, "klasse": klasse,
             "regelsatz": regelsatz, "hoechstsatz": hoechstsatz,
             "herkunft": "direkt" if herkunft == "direkt" else "sammel",
+            # Nummer des Hoechstwerts, dem diese Leistung zugeordnet ist.
+            "hoechstwert": zuordnung.get(kennzeichen, "") if kennzeichen else "",
         })
 
     for zeile in zeilen:
@@ -305,8 +341,13 @@ def baue_eintraege(zeilen: list[dict], anlage: str) -> tuple[list[dict], dict, l
             continue
         offen.append(f"{code} {bezeichnung[:52]}")
 
-    for nummer, bezeichnung, punkte in volltext.fehlende_nummern(gesehen):
-        aufnehmen(nummer, bezeichnung, punkte, "sammel")
+    # Was die Tabellenaufbereitung verloren hat, aus dem Volltext nachtragen.
+    for nummer, bezeichnung, punkte, kennzeichen in volltext.fehlende_mit_preis(gesehen):
+        aufnehmen(nummer, bezeichnung, punkte, "direkt", kennzeichen)
+        zaehler["direkt"] -= 1
+        zaehler["nachgetragen"] += 1
+    for nummer, bezeichnung, punkte, kennzeichen in volltext.fehlende_nummern(gesehen):
+        aufnehmen(nummer, bezeichnung, punkte, "sammel", kennzeichen)
         zaehler["sammel"] -= 1
         zaehler["nachgetragen"] += 1
 
@@ -352,6 +393,9 @@ def schreibe(eintraege: list[dict], ziel: Path, goae: dict) -> None:
 #                 sammel = Nummer gehoert zu einer Sammelposition; die Punktzahl
 #                          steht in deren Ueberschrift ("... je Messgroesse 70
 #                          7,98 Katalog 3512 ... 3514 Glukose ...")
+#   hoechstwert   Nummer des Hoechstwerts, dem die Leistung zugeordnet ist
+#                 (im Verzeichnis als Zusatz an der Nummer: 3562.H1 -> 3541.H).
+#                 Leer, wenn kein Hoechstwert gilt.
 """
     ziel.parent.mkdir(parents=True, exist_ok=True)
     with ziel.open("w", encoding="utf-8", newline="") as datei:
@@ -359,7 +403,7 @@ def schreibe(eintraege: list[dict], ziel: Path, goae: dict) -> None:
         schreiber = csv.DictWriter(
             datei, delimiter=";",
             fieldnames=["nummer", "bezeichnung", "punktzahl", "abschnitt", "klasse",
-                        "regelsatz", "hoechstsatz", "herkunft"],
+                        "regelsatz", "hoechstsatz", "herkunft", "hoechstwert"],
         )
         schreiber.writeheader()
         schreiber.writerows(eintraege)

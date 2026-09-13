@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Sequence
 from xml.sax.saxutils import escape
 
-from . import farben
+from . import angaben, farben
 from .modelle import Angebot
 
 # Formatvorlagen -> Index in cellXfs (siehe _STYLES_XML)
@@ -291,6 +291,7 @@ def angebot_blatt(angebot: Angebot, name: str | None = None) -> Blatt:
         "Angaben ohne Gewaehr.",
         "hinweis",
     )])
+    z.append([Zelle(f"{angaben.IMPRESSUM['praxis']}  ·  {angaben.COPYRIGHT}", "hinweis")])
     return Blatt(name=name or angebot.name or "Angebot", zeilen=z, breiten=BREITEN)
 
 

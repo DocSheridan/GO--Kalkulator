@@ -7,6 +7,7 @@
  */
 
 import { excel as exf, GRAU, GRUEN, GRUEN_TON, WEISS } from './farben.js';
+import { COPYRIGHT, PRAXIS } from './angaben.js';
 import { faktorText } from './modelle.js';
 
 const KRZ = (() => {
@@ -197,6 +198,7 @@ export function angebotAlsXlsx(angebot) {
   zeilen.push([{ wert: 'Berechnung nach GOÄ: Punktzahl × Punktwert (0,0582873 EUR) × Faktor. '
     + 'Faktoren oberhalb des Regelsatzes sind schriftlich zu begründen (§ 12 GOÄ). Angaben ohne Gewähr.',
   stil: 'hinweis' }]);
+  zeilen.push([{ wert: `${PRAXIS}  ·  ${COPYRIGHT}`, stil: 'hinweis' }]);
 
   const blatt = blattXml(zeilen, [10, 46, 6, 8, 12, 12, 12, 9, 13, 34]);
   return packe([
