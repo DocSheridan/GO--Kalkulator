@@ -6,7 +6,12 @@
  * Testfaelle.
  */
 
-export const COPYRIGHT = '© 2026 Raimar Lorrmann';
+// Der Vermerk wird zweiteilig geführt, weil der Zusatz kleiner gesetzt wird -
+// in der App, auf dem Ausdruck und in der Excel-Tabelle. Wo keine Schriftgrade
+// möglich sind, dient COPYRIGHT als schlichte Zusammensetzung.
+export const COPYRIGHT_HAUPT = '© 2026 Dr. med. Raimar Lorrmann D. O.';
+export const COPYRIGHT_ZUSATZ = '(DAAO)';
+export const COPYRIGHT = `${COPYRIGHT_HAUPT} ${COPYRIGHT_ZUSATZ}`;
 export const PRAXIS = 'Die Hausärzte im Sheridan';
 
 /**

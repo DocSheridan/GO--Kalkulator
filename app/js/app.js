@@ -4,7 +4,7 @@ import {
   Angebot, MAX_FAKTOR, MIN_FAKTOR, Position,
   betragAusText, faktorAusText, faktorText, geld,
 } from './modelle.js';
-import { COPYRIGHT, IMPRESSUM } from './angaben.js';
+import { COPYRIGHT_HAUPT, COPYRIGHT_ZUSATZ, IMPRESSUM } from './angaben.js';
 import { Katalog } from './katalog.js';
 import { EigeneFehler, EigeneZiffern, katalogMitEigenen } from './eigene.js';
 import { Angebotsverzeichnis } from './speicher.js';
@@ -590,6 +590,12 @@ function verdrahte() {
   });
 }
 
+/** Urheberrechtsvermerk; der Zusatz steht in kleinerem Schriftgrad. */
+function vermerk() {
+  return `${maskiere(COPYRIGHT_HAUPT)} `
+    + `<span class="zusatz">${maskiere(COPYRIGHT_ZUSATZ)}</span>`;
+}
+
 function zeigeImpressum() {
   const feld = $('#impressum-inhalt');
   const zeile = (wert) => (wert === '…'
@@ -603,7 +609,7 @@ function zeigeImpressum() {
     <h3>Zuständige Kammer</h3><p>${zeile(IMPRESSUM.kammer)}</p>
     <h3>Aufsichtsbehörde</h3><p>${zeile(IMPRESSUM.aufsicht)}</p>
     <h3>Urheberrecht</h3>
-    <p>${maskiere(COPYRIGHT)}. Alle Rechte vorbehalten.</p>
+    <p>${vermerk()}. Alle Rechte vorbehalten.</p>
     <h3>Berechnungsgrundlage</h3>
     <p>Gebührenordnung für Ärzte (GOÄ), amtliche Fassung.
        Die Kalkulation ersetzt keine abrechnungsrechtliche Prüfung; Angaben ohne Gewähr.</p>`;
@@ -649,7 +655,7 @@ function fuelleDruckblatt() {
       Dies ist ein unverbindlicher Kostenvoranschlag; maßgeblich ist die tatsächlich
       erbrachte Leistung. Angaben ohne Gewähr.
     </p>
-    <p class="fuss">${maskiere(IMPRESSUM.praxis)} · ${maskiere(COPYRIGHT)}</p>`;
+    <p class="fuss">${maskiere(IMPRESSUM.praxis)} · ${vermerk()}</p>`;
 }
 
 function drucken() {

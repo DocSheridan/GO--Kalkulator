@@ -489,6 +489,9 @@ main { padding: 12px 12px 0; max-width: 760px; margin: 0 auto; }
 .impressum p { margin: 0 0 4px; color: var(--text); }
 .impressum .platzhalter { color: var(--warnung); }
 
+/* Zusatz des Urheberrechtsvermerks - kleiner als der Name davor. */
+.zusatz { font-size: .78em; }
+
 /* ------------------------------------------------------------- Ausdruck */
 .druckblatt { display: none; }
 
@@ -511,6 +514,7 @@ main { padding: 12px 12px 0; max-width: 760px; margin: 0 auto; }
                          font-weight: 700; padding-top: 2.5mm; }
   .druckblatt .anmerkung { margin-top: 6mm; font-size: 8.5pt; color: #333; }
   .druckblatt .fuss { margin-top: 4mm; font-size: 8pt; color: #555; }
+  .druckblatt .fuss .zusatz { font-size: 6.5pt; }
   tr { page-break-inside: avoid; }
   @page { margin: 18mm 15mm; }
 }

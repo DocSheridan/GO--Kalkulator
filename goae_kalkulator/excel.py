@@ -102,6 +102,15 @@ def _spaltenname(index: int) -> str:
     return name
 
 
+def _lauf(text: str, groesse: float) -> str:
+    """Ein Textlauf mit eigenem Schriftgrad innerhalb einer Zelle."""
+    return (
+        f'<r><rPr><i/><sz val="{groesse}"/>'
+        f'<color rgb="{farben.excel(farben.GRAU)}"/><rFont val="Calibri"/></rPr>'
+        f'<t xml:space="preserve">{escape(text)}</t></r>'
+    )
+
+
 def _zelle_xml(spalte: int, zeile: int, zelle: Zelle) -> str:
     ref = f"{_spaltenname(spalte)}{zeile}"
     stil = STIL.get(zelle.stil, 0)
@@ -112,6 +121,11 @@ def _zelle_xml(spalte: int, zeile: int, zelle: Zelle) -> str:
         wert = "ja" if wert else "nein"
     if isinstance(wert, (int, float, Decimal)):
         return f'<c r="{ref}" s="{stil}"><v>{wert}</v></c>'
+    if isinstance(wert, list):
+        # Mehrere Schriftgrade in einer Zelle - dafuer verlangt das Format
+        # einzelne Laeufe statt eines schlichten Textes.
+        laeufe = "".join(_lauf(text, groesse) for text, groesse in wert)
+        return f'<c r="{ref}" s="{stil}" t="inlineStr"><is>{laeufe}</is></c>'
     text = escape(str(wert))
     return f'<c r="{ref}" s="{stil}" t="inlineStr"><is><t xml:space="preserve">{text}</t></is></c>'
 
@@ -291,7 +305,11 @@ def angebot_blatt(angebot: Angebot, name: str | None = None) -> Blatt:
         "Angaben ohne Gewaehr.",
         "hinweis",
     )])
-    z.append([Zelle(f"{angaben.IMPRESSUM['praxis']}  ·  {angaben.COPYRIGHT}", "hinweis")])
+    # Der Zusatz des Urheberrechtsvermerks steht kleiner als der Name davor.
+    z.append([Zelle([
+        (f"{angaben.IMPRESSUM['praxis']}  ·  {angaben.COPYRIGHT_HAUPT} ", 9),
+        (angaben.COPYRIGHT_ZUSATZ, 7),
+    ], "hinweis")])
     return Blatt(name=name or angebot.name or "Angebot", zeilen=z, breiten=BREITEN)
 
 

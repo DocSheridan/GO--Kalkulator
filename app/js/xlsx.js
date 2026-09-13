@@ -7,7 +7,7 @@
  */
 
 import { excel as exf, GRAU, GRUEN, GRUEN_TON, WEISS } from './farben.js';
-import { COPYRIGHT, PRAXIS } from './angaben.js';
+import { COPYRIGHT_HAUPT, COPYRIGHT_ZUSATZ, PRAXIS } from './angaben.js';
 import { faktorText } from './modelle.js';
 
 const KRZ = (() => {
@@ -139,6 +139,11 @@ const spaltenname = (index) => {
   return name;
 };
 
+/** Ein Textlauf mit eigenem Schriftgrad innerhalb einer Zelle. */
+const lauf = (text, groesse) => `<r><rPr><i/><sz val="${groesse}"/>`
+  + `<color rgb="${exf(GRAU)}"/><rFont val="Calibri"/></rPr>`
+  + `<t xml:space="preserve">${maskiere(text)}</t></r>`;
+
 function blattXml(zeilen, breiten) {
   const cols = breiten.map((b, i) => `<col min="${i + 1}" max="${i + 1}" width="${b}" customWidth="1"/>`).join('');
   const inhalt = zeilen.map((zeile, nr) => {
@@ -148,6 +153,12 @@ function blattXml(zeilen, breiten) {
       const stil = STIL[zelle.stil ?? 'normal'] ?? 0;
       if (zelle.wert === null || zelle.wert === '') return `<c r="${ref}" s="${stil}"/>`;
       if (typeof zelle.wert === 'number') return `<c r="${ref}" s="${stil}"><v>${zelle.wert}</v></c>`;
+      if (Array.isArray(zelle.wert)) {
+        // Mehrere Schriftgrade in einer Zelle - dafür verlangt das Format
+        // einzelne Läufe statt eines schlichten Textes.
+        const laeufe = zelle.wert.map(([text, groesse]) => lauf(text, groesse)).join('');
+        return `<c r="${ref}" s="${stil}" t="inlineStr"><is>${laeufe}</is></c>`;
+      }
       return `<c r="${ref}" s="${stil}" t="inlineStr"><is><t xml:space="preserve">${maskiere(zelle.wert)}</t></is></c>`;
     }).join('');
     return zellen ? `<row r="${nr + 1}">${zellen}</row>` : `<row r="${nr + 1}"/>`;
@@ -198,7 +209,9 @@ export function angebotAlsXlsx(angebot) {
   zeilen.push([{ wert: 'Berechnung nach GOÄ: Punktzahl × Punktwert (0,0582873 EUR) × Faktor. '
     + 'Faktoren oberhalb des Regelsatzes sind schriftlich zu begründen (§ 12 GOÄ). Angaben ohne Gewähr.',
   stil: 'hinweis' }]);
-  zeilen.push([{ wert: `${PRAXIS}  ·  ${COPYRIGHT}`, stil: 'hinweis' }]);
+  // Der Zusatz des Urheberrechtsvermerks steht kleiner als der Name davor.
+  zeilen.push([{ wert: [[`${PRAXIS}  ·  ${COPYRIGHT_HAUPT} `, 9], [COPYRIGHT_ZUSATZ, 7]],
+    stil: 'hinweis' }]);
 
   const blatt = blattXml(zeilen, [10, 46, 6, 8, 12, 12, 12, 9, 13, 34]);
   return packe([

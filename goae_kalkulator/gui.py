@@ -8,7 +8,7 @@ from pathlib import Path
 
 try:
     import tkinter as tk
-    from tkinter import filedialog, messagebox, ttk
+    from tkinter import filedialog, font as tkfont, messagebox, ttk
 except ImportError:  # pragma: no cover - nur ohne installiertes tkinter
     tk = None
 
@@ -791,22 +791,7 @@ class Anwendung(tk.Tk):
             parent=self)
 
     def impressum(self) -> None:
-        offen = "noch einzutragen"
-        werte = {k: (offen if v == "…" else v) for k, v in angaben.IMPRESSUM.items()}
-        messagebox.showinfo(
-            "Impressum",
-            f"Verantwortlich: {werte['verantwortlich']}\n"
-            f"{werte['praxis']}\n\n"
-            f"Anschrift: {werte['anschrift']}\n"
-            f"Kontakt: {werte['kontakt']}\n"
-            f"Berufsbezeichnung: {werte['berufsbezeichnung']}\n"
-            f"Zuständige Kammer: {werte['kammer']}\n"
-            f"Aufsichtsbehörde: {werte['aufsicht']}\n\n"
-            f"{angaben.COPYRIGHT}. Alle Rechte vorbehalten.\n\n"
-            "Berechnungsgrundlage: Gebührenordnung für Ärzte (GOÄ), amtliche Fassung. "
-            "Die Kalkulation ersetzt keine abrechnungsrechtliche Prüfung; "
-            "Angaben ohne Gewähr.",
-            parent=self)
+        Impressumfenster(self)
 
     def beenden(self) -> None:
         if self._darf_verwerfen():
@@ -885,6 +870,66 @@ class Auswahlfenster(tk.Toplevel):
         self.eltern.verzeichnis.loeschen(eintrag["name"])
         self.destroy()
         self.eltern.oeffnen()
+
+
+class Impressumfenster(tk.Toplevel):
+    """Impressum und Urheberrecht.
+
+    Ein eigenes Fenster statt einer Meldung, weil der Zusatz des
+    Urheberrechtsvermerks kleiner gesetzt wird - Schriftgrade lassen sich in
+    einem Meldungsfenster nicht bestimmen.
+    """
+
+    def __init__(self, eltern: Anwendung):
+        super().__init__(eltern)
+        self.title("Impressum")
+        self.transient(eltern)
+        self.grab_set()
+        self.resizable(False, False)
+
+        rahmen = ttk.Frame(self, padding=16)
+        rahmen.pack(fill="both", expand=True)
+        offen = "noch einzutragen"
+        felder = [
+            ("Verantwortlich", angaben.IMPRESSUM["verantwortlich"]),
+            ("Praxis", angaben.IMPRESSUM["praxis"]),
+            ("Anschrift", angaben.IMPRESSUM["anschrift"]),
+            ("Kontakt", angaben.IMPRESSUM["kontakt"]),
+            ("Berufsbezeichnung", angaben.IMPRESSUM["berufsbezeichnung"]),
+            ("Zuständige Kammer", angaben.IMPRESSUM["kammer"]),
+            ("Aufsichtsbehörde", angaben.IMPRESSUM["aufsicht"]),
+        ]
+        for zeile, (name, wert) in enumerate(felder):
+            ttk.Label(rahmen, text=name, foreground=farben.GRAU).grid(
+                row=zeile, column=0, sticky="ne", padx=(0, 12), pady=2)
+            ttk.Label(rahmen, text=(offen if wert == "…" else wert),
+                      foreground=farben.WARNUNG if wert == "…" else None).grid(
+                row=zeile, column=1, sticky="w", pady=2)
+
+        ttk.Separator(rahmen, orient="horizontal").grid(
+            row=len(felder), column=0, columnspan=2, sticky="ew", pady=(12, 8))
+
+        ttk.Label(rahmen, text="Urheberrecht", foreground=farben.GRAU).grid(
+            row=len(felder) + 1, column=0, sticky="ne", padx=(0, 12))
+        vermerk = ttk.Frame(rahmen)
+        vermerk.grid(row=len(felder) + 1, column=1, sticky="w")
+        grundschrift = tkfont.nametofont("TkDefaultFont")
+        klein = grundschrift.copy()
+        klein.configure(size=max(7, int(grundschrift.cget("size") * 0.8)))
+        ttk.Label(vermerk, text=angaben.COPYRIGHT_HAUPT).pack(side="left")
+        ttk.Label(vermerk, text=f" {angaben.COPYRIGHT_ZUSATZ}.", font=klein).pack(
+            side="left", anchor="s")
+        ttk.Label(vermerk, text=" Alle Rechte vorbehalten.").pack(side="left")
+
+        ttk.Label(
+            rahmen, wraplength=460, justify="left", foreground=farben.GRAU,
+            text="Berechnungsgrundlage: Gebührenordnung für Ärzte (GOÄ), amtliche Fassung. "
+                 "Die Kalkulation ersetzt keine abrechnungsrechtliche Prüfung; "
+                 "Angaben ohne Gewähr.",
+        ).grid(row=len(felder) + 2, column=0, columnspan=2, sticky="w", pady=(12, 0))
+
+        ttk.Button(rahmen, text="Schließen", command=self.destroy).grid(
+            row=len(felder) + 3, column=0, columnspan=2, sticky="e", pady=(14, 0))
 
 
 class Eigenenfenster(tk.Toplevel):

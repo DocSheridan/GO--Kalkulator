@@ -716,8 +716,10 @@ class TestAngaben(unittest.TestCase):
         aus_js = dict(re.findall(r"^  (\w+): '(.*?)',$", quelle, re.M))
         aus_js["praxis"] = re.search(r"export const PRAXIS = '(.*?)'", quelle).group(1)
         self.assertEqual(angaben.IMPRESSUM, aus_js)
-        self.assertEqual(angaben.COPYRIGHT,
-                         re.search(r"export const COPYRIGHT = '(.*?)'", quelle).group(1))
+        for name, wert in [("COPYRIGHT_HAUPT", angaben.COPYRIGHT_HAUPT),
+                           ("COPYRIGHT_ZUSATZ", angaben.COPYRIGHT_ZUSATZ)]:
+            self.assertEqual(
+                re.search(rf"export const {name} = '(.*?)'", quelle).group(1), wert)
 
     def test_urheberrechtsvermerk_steht_auf_der_tabelle(self):
         angebot = Angebot(name="Vermerk")
@@ -726,8 +728,23 @@ class TestAngaben(unittest.TestCase):
             pfad = exportiere(angebot, Path(ordner) / "vermerk.xlsx")
             with zipfile.ZipFile(pfad) as archiv:
                 blatt = archiv.read("xl/worksheets/sheet1.xml").decode()
-        self.assertIn("Raimar Lorrmann", blatt)
+        self.assertIn("Dr. med. Raimar Lorrmann", blatt)
         self.assertIn(angaben.IMPRESSUM["praxis"], blatt)
+
+    def test_zusatz_des_vermerks_steht_kleiner(self):
+        """Name und Zusatz liegen als eigene Textlaeufe mit verschiedenen
+        Schriftgraden in einer Zelle."""
+        angebot = Angebot(name="Vermerk")
+        angebot.hinzufuegen(Position.aus_leistung(leistung()))
+        with tempfile.TemporaryDirectory() as ordner:
+            pfad = exportiere(angebot, Path(ordner) / "vermerk.xlsx")
+            with zipfile.ZipFile(pfad) as archiv:
+                blatt = archiv.read("xl/worksheets/sheet1.xml").decode()
+        stelle = blatt.index(angaben.COPYRIGHT_HAUPT)
+        zelle = blatt[blatt.rindex("<c ", 0, stelle):blatt.index("</c>", stelle)]
+        self.assertIn('<sz val="9"/>', zelle)
+        self.assertIn('<sz val="7"/>', zelle)
+        self.assertIn(angaben.COPYRIGHT_ZUSATZ, zelle)
 
 
 class TestKommandozeile(unittest.TestCase):
