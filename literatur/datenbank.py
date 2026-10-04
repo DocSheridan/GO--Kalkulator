@@ -24,10 +24,15 @@ from pathlib import Path
 
 DATENBANK = "literatur.sqlite"
 DATEIORDNER = "Artikel"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 STANDARD_KATEGORIEN = ("Qualitätsmanagement", "Medizin", "Formulare", "Sonstiges")
 STANDARD_BEREICHE = ("Qualitätsmanagement", "Formulare", "Infektiologie", "Metabolik")
+# Rubriken (Unterkategorien) je Kategorie.
+STANDARD_RUBRIKEN = {
+    "Qualitätsmanagement": ("Arbeitsanweisungen", "Prozessbeschreibungen",
+                            "Funktionsbeschreibungen", "Gebrauchsanleitungen", "Einweisungen"),
+}
 
 # Zeitraum des Reiters "Neues".
 NEU_TAGE = 31
@@ -51,6 +56,13 @@ CREATE TABLE IF NOT EXISTS bereiche (
     name      TEXT NOT NULL UNIQUE COLLATE NOCASE,
     position  INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS rubriken (
+    id            INTEGER PRIMARY KEY,
+    kategorie_id  INTEGER NOT NULL REFERENCES kategorien(id) ON DELETE CASCADE,
+    name          TEXT NOT NULL COLLATE NOCASE,
+    position      INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (kategorie_id, name)
+);
 CREATE TABLE IF NOT EXISTS artikel (
     id            INTEGER PRIMARY KEY,
     titel         TEXT NOT NULL,
@@ -62,6 +74,7 @@ CREATE TABLE IF NOT EXISTS artikel (
     datei         TEXT NOT NULL DEFAULT '',
     originalname  TEXT NOT NULL DEFAULT '',
     kategorie_id  INTEGER NOT NULL REFERENCES kategorien(id) ON DELETE RESTRICT,
+    rubrik_id     INTEGER REFERENCES rubriken(id) ON DELETE SET NULL,
     angelegt      TEXT NOT NULL,
     geaendert     TEXT NOT NULL
 );
@@ -74,8 +87,14 @@ CREATE INDEX IF NOT EXISTS artikel_kategorie ON artikel(kategorie_id);
 CREATE INDEX IF NOT EXISTS artikel_bereiche_bereich ON artikel_bereiche(bereich_id);
 """
 
+# Nachtraege fuer Datenbanken aelterer Programmversionen.
+UMSTELLUNGEN = {
+    2: "ALTER TABLE artikel ADD COLUMN rubrik_id INTEGER"
+       " REFERENCES rubriken(id) ON DELETE SET NULL",
+}
+
 # Tabellen der beiden veraenderbaren Listen.
-LISTEN = {"kategorien", "bereiche"}
+LISTEN = {"kategorien", "bereiche", "rubriken"}
 
 
 class LiteraturFehler(Exception):
@@ -89,6 +108,7 @@ class Eintrag:
     id: int
     name: str
     anzahl: int = 0          # zugeordnete Artikel
+    kategorie_id: int | None = None   # nur bei Rubriken
 
 
 @dataclass
@@ -97,6 +117,8 @@ class Artikel:
     titel: str
     kategorie_id: int
     kategorie: str = ""
+    rubrik_id: int | None = None
+    rubrik: str = ""
     autoren: str = ""
     jahr: str = ""
     quelle: str = ""
@@ -116,7 +138,7 @@ class Artikel:
     def suchtext(self) -> str:
         return " ".join((
             self.titel, self.autoren, self.jahr, self.quelle, self.schlagworte,
-            self.notiz, self.originalname, self.kategorie, " ".join(self.bereiche),
+            self.notiz, self.originalname, self.kategorie, self.rubrik, " ".join(self.bereiche),
         )).casefold()
 
 
@@ -176,13 +198,26 @@ class Literaturdatenbank:
                 raise LiteraturFehler(
                     "Die Datenbank stammt aus einer neueren Programmversion. "
                     "Bitte das Programm auf diesem Arbeitsplatz aktualisieren.")
+            if version == SCHEMA_VERSION:
+                return self
+            if version > 0:
+                for schritt in range(version + 1, SCHEMA_VERSION + 1):
+                    db.execute(UMSTELLUNGEN[schritt])
             db.executescript(SCHEMA)
             if version == 0:
                 if not db.execute("SELECT 1 FROM kategorien").fetchone():
                     self._vorgaben(db, "kategorien", STANDARD_KATEGORIEN)
                 if not db.execute("SELECT 1 FROM bereiche").fetchone():
                     self._vorgaben(db, "bereiche", STANDARD_BEREICHE)
-                db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            if version < 2 and not db.execute("SELECT 1 FROM rubriken").fetchone():
+                for kategorie, namen in STANDARD_RUBRIKEN.items():
+                    zeile = db.execute("SELECT id FROM kategorien WHERE name = ?",
+                                       (kategorie,)).fetchone()
+                    if zeile:
+                        db.executemany(
+                            "INSERT INTO rubriken (kategorie_id, name, position)"
+                            " VALUES (?, ?, ?)", [(zeile[0], n, i) for i, n in enumerate(namen)])
+            db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         return self
 
     @staticmethod
@@ -221,7 +256,7 @@ class Literaturdatenbank:
         finally:
             db.close()
 
-    # -- Kategorien und Bereiche -----------------------------------------
+    # -- Kategorien, Rubriken und Bereiche -------------------------------
     def kategorien(self) -> list[Eintrag]:
         return self._liste("kategorien", "SELECT COUNT(*) FROM artikel WHERE kategorie_id = l.id")
 
@@ -229,12 +264,34 @@ class Literaturdatenbank:
         return self._liste(
             "bereiche", "SELECT COUNT(*) FROM artikel_bereiche WHERE bereich_id = l.id")
 
-    def _liste(self, tabelle: str, zaehlung: str) -> list[Eintrag]:
+    def rubriken(self, kategorie_id: int | None = None) -> list[Eintrag]:
+        """Rubriken einer Kategorie - oder aller Kategorien, wenn keine angegeben ist."""
+        wo, werte = ("WHERE l.kategorie_id = ?", (kategorie_id,)) if kategorie_id else ("", ())
+        return self._liste("rubriken", "SELECT COUNT(*) FROM artikel WHERE rubrik_id = l.id",
+                           wo, werte)
+
+    def _liste(self, tabelle: str, zaehlung: str, wo: str = "", werte=()) -> list[Eintrag]:
+        gruppe = ", l.kategorie_id" if tabelle == "rubriken" else ", NULL"
         with self._verbindung() as db:
             zeilen = db.execute(
-                f"SELECT l.id, l.name, ({zaehlung}) AS anzahl FROM {tabelle} l "
-                "ORDER BY l.position, l.name COLLATE NOCASE").fetchall()
-        return [Eintrag(z["id"], z["name"], z["anzahl"]) for z in zeilen]
+                f"SELECT l.id, l.name, ({zaehlung}) AS anzahl{gruppe} AS kategorie_id"
+                f" FROM {tabelle} l {wo} ORDER BY l.position, l.name COLLATE NOCASE",
+                werte).fetchall()
+        return [Eintrag(z["id"], z["name"], z["anzahl"], z["kategorie_id"]) for z in zeilen]
+
+    @staticmethod
+    def _gruppe(db: sqlite3.Connection, tabelle: str, eintrag_id: int | None = None,
+                kategorie_id: int | None = None) -> tuple[str, tuple]:
+        """Rubriken sind je Kategorie eine eigene Liste; die anderen Listen sind global."""
+        if tabelle != "rubriken":
+            return "1 = 1", ()
+        if kategorie_id is None and eintrag_id is not None:
+            zeile = db.execute("SELECT kategorie_id FROM rubriken WHERE id = ?",
+                               (eintrag_id,)).fetchone()
+            kategorie_id = zeile[0] if zeile else None
+        if kategorie_id is None:
+            raise LiteraturFehler("Bitte zuerst eine Kategorie fuer die Rubrik waehlen.")
+        return "kategorie_id = ?", (kategorie_id,)
 
     @staticmethod
     def _pruefe_liste(tabelle: str) -> str:
@@ -249,14 +306,26 @@ class Literaturdatenbank:
             raise LiteraturFehler("Der Name darf nicht leer sein.")
         return name
 
-    def eintrag_hinzufuegen(self, tabelle: str, name: str) -> int:
+    def eintrag_hinzufuegen(self, tabelle: str, name: str,
+                            kategorie_id: int | None = None) -> int:
+        """Neuer Listeneintrag; Rubriken brauchen ihre Kategorie."""
         tabelle = self._pruefe_liste(tabelle)
         name = self._pruefe_name(name)
         with self._verbindung() as db:
-            if db.execute(f"SELECT 1 FROM {tabelle} WHERE name = ?", (name,)).fetchone():
+            gruppe, werte = self._gruppe(db, tabelle, kategorie_id=kategorie_id)
+            if db.execute(f"SELECT 1 FROM {tabelle} WHERE name = ? AND {gruppe}",
+                          (name, *werte)).fetchone():
                 raise LiteraturFehler(f"{name!r} steht bereits in der Liste.")
             position = db.execute(
-                f"SELECT COALESCE(MAX(position), -1) + 1 FROM {tabelle}").fetchone()[0]
+                f"SELECT COALESCE(MAX(position), -1) + 1 FROM {tabelle} WHERE {gruppe}",
+                werte).fetchone()[0]
+            if tabelle == "rubriken":
+                if not db.execute("SELECT 1 FROM kategorien WHERE id = ?",
+                                  (kategorie_id,)).fetchone():
+                    raise LiteraturFehler("Die gewaehlte Kategorie gibt es nicht mehr.")
+                return db.execute(
+                    "INSERT INTO rubriken (kategorie_id, name, position) VALUES (?, ?, ?)",
+                    (kategorie_id, name, position)).lastrowid
             return db.execute(f"INSERT INTO {tabelle} (name, position) VALUES (?, ?)",
                               (name, position)).lastrowid
 
@@ -264,8 +333,10 @@ class Literaturdatenbank:
         tabelle = self._pruefe_liste(tabelle)
         name = self._pruefe_name(name)
         with self._verbindung() as db:
-            doppelt = db.execute(f"SELECT 1 FROM {tabelle} WHERE name = ? AND id <> ?",
-                                 (name, eintrag_id)).fetchone()
+            gruppe, werte = self._gruppe(db, tabelle, eintrag_id)
+            doppelt = db.execute(
+                f"SELECT 1 FROM {tabelle} WHERE name = ? AND id <> ? AND {gruppe}",
+                (name, eintrag_id, *werte)).fetchone()
             if doppelt:
                 raise LiteraturFehler(f"{name!r} steht bereits in der Liste.")
             db.execute(f"UPDATE {tabelle} SET name = ? WHERE id = ?", (name, eintrag_id))
@@ -274,8 +345,10 @@ class Literaturdatenbank:
         """Rueckt einen Eintrag um eine Stelle nach oben (-1) oder unten (+1)."""
         tabelle = self._pruefe_liste(tabelle)
         with self._verbindung() as db:
+            gruppe, werte = self._gruppe(db, tabelle, eintrag_id)
             ids = [z[0] for z in db.execute(
-                f"SELECT id FROM {tabelle} ORDER BY position, name COLLATE NOCASE")]
+                f"SELECT id FROM {tabelle} WHERE {gruppe}"
+                " ORDER BY position, name COLLATE NOCASE", werte)]
             if eintrag_id not in ids:
                 return
             alt = ids.index(eintrag_id)
@@ -301,11 +374,20 @@ class Literaturdatenbank:
                 if not db.execute("SELECT 1 FROM kategorien WHERE id = ?",
                                   (ersatz_id,)).fetchone():
                     raise LiteraturFehler("Die gewaehlte Ersatzkategorie gibt es nicht mehr.")
-                db.execute("UPDATE artikel SET kategorie_id = ?, geaendert = ? "
-                           "WHERE kategorie_id = ?", (ersatz_id, jetzt(), kategorie_id))
+                # Die Rubriken gehoeren zur alten Kategorie und entfallen.
+                db.execute("UPDATE artikel SET kategorie_id = ?, rubrik_id = NULL,"
+                           " geaendert = ? WHERE kategorie_id = ?",
+                           (ersatz_id, jetzt(), kategorie_id))
             elif db.execute("SELECT COUNT(*) FROM kategorien").fetchone()[0] <= 1:
                 raise LiteraturFehler("Die letzte Kategorie kann nicht geloescht werden.")
             db.execute("DELETE FROM kategorien WHERE id = ?", (kategorie_id,))
+
+    def rubrik_loeschen(self, rubrik_id: int) -> None:
+        """Entfernt eine Rubrik; ihre Artikel bleiben in der Kategorie erhalten."""
+        with self._verbindung() as db:
+            db.execute("UPDATE artikel SET rubrik_id = NULL, geaendert = ? WHERE rubrik_id = ?",
+                       (jetzt(), rubrik_id))
+            db.execute("DELETE FROM rubriken WHERE id = ?", (rubrik_id,))
 
     def bereich_loeschen(self, bereich_id: int) -> None:
         """Entfernt einen Bereich; die Artikel selbst bleiben erhalten."""
@@ -314,7 +396,7 @@ class Literaturdatenbank:
 
     # -- Artikel ----------------------------------------------------------
     def artikel_anlegen(self, quelldatei: Path | str | None, titel: str, kategorie_id: int,
-                        bereich_ids=(), schlagworte: str = "", autoren: str = "",
+                        rubrik_id: int | None = None, bereich_ids=(), schlagworte: str = "", autoren: str = "",
                         jahr: str = "", quelle: str = "", notiz: str = "") -> Artikel:
         """Katalogisiert einen neuen Artikel und kopiert seine Datei in den Datenordner."""
         titel = self._pruefe_titel(titel)
@@ -325,14 +407,15 @@ class Literaturdatenbank:
         kopie: Path | None = None
         try:
             with self._verbindung() as db:
-                self._pruefe_kategorie(db, kategorie_id)
+                self._pruefe_kategorie(db, kategorie_id, rubrik_id)
                 artikel_id = db.execute(
                     "INSERT INTO artikel (titel, autoren, jahr, quelle, schlagworte, notiz,"
-                    " originalname, kategorie_id, angelegt, geaendert)"
-                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    " originalname, kategorie_id, rubrik_id, angelegt, geaendert)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (titel, autoren.strip(), jahr.strip(), quelle.strip(),
                      normiere_schlagworte(schlagworte), notiz.strip(),
-                     quell.name if quell else "", kategorie_id, zeit, zeit)).lastrowid
+                     quell.name if quell else "", kategorie_id, rubrik_id, zeit,
+                     zeit)).lastrowid
                 self._setze_bereiche(db, artikel_id, bereich_ids)
                 if quell is not None:
                     kopie = self._kopiere(quell, artikel_id, titel)
@@ -346,16 +429,17 @@ class Literaturdatenbank:
         return self.artikel(artikel_id)
 
     def artikel_aendern(self, artikel_id: int, titel: str, kategorie_id: int,
-                        bereich_ids=(), schlagworte: str = "", autoren: str = "",
+                        rubrik_id: int | None = None, bereich_ids=(), schlagworte: str = "", autoren: str = "",
                         jahr: str = "", quelle: str = "", notiz: str = "") -> Artikel:
         titel = self._pruefe_titel(titel)
         with self._verbindung() as db:
-            self._pruefe_kategorie(db, kategorie_id)
+            self._pruefe_kategorie(db, kategorie_id, rubrik_id)
             geaendert = db.execute(
                 "UPDATE artikel SET titel = ?, autoren = ?, jahr = ?, quelle = ?,"
-                " schlagworte = ?, notiz = ?, kategorie_id = ?, geaendert = ? WHERE id = ?",
+                " schlagworte = ?, notiz = ?, kategorie_id = ?, rubrik_id = ?, geaendert = ?"
+                " WHERE id = ?",
                 (titel, autoren.strip(), jahr.strip(), quelle.strip(),
-                 normiere_schlagworte(schlagworte), notiz.strip(), kategorie_id,
+                 normiere_schlagworte(schlagworte), notiz.strip(), kategorie_id, rubrik_id,
                  jetzt(), artikel_id)).rowcount
             if not geaendert:
                 raise LiteraturFehler(
@@ -405,7 +489,7 @@ class Literaturdatenbank:
 
     def suche(self, text: str = "", kategorie_id: int | None = None,
               bereich_id: int | None = None, neu_seit_tagen: int | None = None,
-              ) -> list[Artikel]:
+              rubrik_id: int | None = None) -> list[Artikel]:
         """Alle Artikel, wahlweise nach Kategorie, Bereich und Suchbegriffen gefiltert.
 
         neu_seit_tagen beschraenkt auf Artikel, die in diesem Zeitraum
@@ -418,6 +502,9 @@ class Literaturdatenbank:
         if kategorie_id is not None:
             bedingungen.append("a.kategorie_id = ?")
             werte.append(kategorie_id)
+        if rubrik_id is not None:
+            bedingungen.append("a.rubrik_id = ?")
+            werte.append(rubrik_id)
         if bereich_id is not None:
             bedingungen.append(
                 "EXISTS (SELECT 1 FROM artikel_bereiche x"
@@ -447,8 +534,9 @@ class Literaturdatenbank:
     def _lade(self, wo: str, werte) -> list[Artikel]:
         with self._verbindung() as db:
             zeilen = db.execute(
-                "SELECT a.*, k.name AS kategorie FROM artikel a"
-                f" JOIN kategorien k ON k.id = a.kategorie_id {wo}"
+                "SELECT a.*, k.name AS kategorie, COALESCE(r.name, '') AS rubrik"
+                " FROM artikel a JOIN kategorien k ON k.id = a.kategorie_id"
+                f" LEFT JOIN rubriken r ON r.id = a.rubrik_id {wo}"
                 " ORDER BY a.angelegt DESC, a.id DESC", list(werte)).fetchall()
             zuordnung: dict[int, list[tuple[int, str]]] = {}
             for z in db.execute(
@@ -461,7 +549,8 @@ class Literaturdatenbank:
             bereiche = zuordnung.get(z["id"], [])
             ergebnis.append(Artikel(
                 id=z["id"], titel=z["titel"], kategorie_id=z["kategorie_id"],
-                kategorie=z["kategorie"], autoren=z["autoren"], jahr=z["jahr"],
+                kategorie=z["kategorie"], rubrik_id=z["rubrik_id"], rubrik=z["rubrik"],
+                autoren=z["autoren"], jahr=z["jahr"],
                 quelle=z["quelle"], schlagworte=z["schlagworte"], notiz=z["notiz"],
                 datei=z["datei"], originalname=z["originalname"],
                 angelegt=z["angelegt"], geaendert=z["geaendert"],
@@ -476,11 +565,15 @@ class Literaturdatenbank:
         return titel
 
     @staticmethod
-    def _pruefe_kategorie(db: sqlite3.Connection, kategorie_id) -> None:
+    def _pruefe_kategorie(db: sqlite3.Connection, kategorie_id, rubrik_id=None) -> None:
         if kategorie_id is None:
             raise LiteraturFehler("Bitte eine Kategorie zuordnen - das ist Pflicht.")
         if not db.execute("SELECT 1 FROM kategorien WHERE id = ?", (kategorie_id,)).fetchone():
             raise LiteraturFehler("Die gewaehlte Kategorie gibt es nicht mehr.")
+        if rubrik_id is not None and not db.execute(
+                "SELECT 1 FROM rubriken WHERE id = ? AND kategorie_id = ?",
+                (rubrik_id, kategorie_id)).fetchone():
+            raise LiteraturFehler("Die gewaehlte Rubrik gehoert nicht zu dieser Kategorie.")
 
     @staticmethod
     def _setze_bereiche(db: sqlite3.Connection, artikel_id: int, bereich_ids) -> None:

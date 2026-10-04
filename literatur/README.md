@@ -14,14 +14,16 @@ python3 literatur.py --ordner L:\Literatur
 
 | | |
 |---|---|
-| **Artikel hinzufügen** | Datei wählen (PDF, Word, Excel, Bilder …); sie wird in den Datenordner kopiert. Titel wird aus dem Dateinamen vorgeschlagen. |
+| **Artikel hinzufügen** | Datei wählen (PDF, Word, Excel, Bilder …); sie wird in den Datenordner kopiert. |
+| **Titel** (Pflicht) | Unter diesem Titel erscheint das Dokument in der Übersicht. Vorbelegt mit dem Dateinamen (ohne Endung), frei änderbar – auch später. |
 | **Kategorie** (Pflicht) | Genau eine je Artikel. Vorgabe: Qualitätsmanagement, Medizin, Formulare, Sonstiges. Ohne Kategorie lässt sich nichts ablegen. |
+| **Rubrik** (Unterkategorie) | Je Kategorie eine eigene Liste. Vorgabe für Qualitätsmanagement: Arbeitsanweisungen, Prozessbeschreibungen, Funktionsbeschreibungen, Gebrauchsanleitungen, Einweisungen. Optional. |
 | **Bereiche** (frei) | Beliebig viele je Artikel. Vorgabe: Qualitätsmanagement, Formulare, Infektiologie, Metabolik. |
 | **Schlagworte** | Freies Feld, durch Komma getrennt; vorhandene Schlagworte lassen sich aus einer Liste einfügen. |
 | **Weitere Angaben** | Autoren, Jahr, Quelle, Notiz |
 | **Nachträglich bearbeiten** | Alle Angaben – auch Kategorie, Bereiche und Schlagworte – rechts ändern und speichern (Strg+S). Datei durch neue Fassung ersetzen. |
-| **Anzeigen** | Reiter **Alle**, **Neues** (in den letzten 31 Tagen abgelegt) oder eine Kategorie; dazu Filter nach Bereich und Volltextsuche. Spalten per Klick sortierbar, Doppelklick öffnet die Datei. |
-| **Listen pflegen** | Menü *Listen*: Kategorien und Bereiche ergänzen, umbenennen, sortieren, entfernen. Wird eine benutzte Kategorie entfernt, fragt das Programm, wohin ihre Artikel wandern. |
+| **Anzeigen** | Reiter **Alle**, **Neues** (in den letzten 31 Tagen abgelegt) oder eine Kategorie; hat sie Rubriken, erscheint darunter eine zweite Leiste zum Filtern nach Rubrik. Dazu Filter nach Bereich und Volltextsuche. Spalten per Klick sortierbar, Doppelklick öffnet die Datei. |
+| **Listen pflegen** | Menü *Listen*: Kategorien, Rubriken und Bereiche ergänzen, umbenennen, sortieren, entfernen. Wird eine benutzte Kategorie entfernt, fragt das Programm, wohin ihre Artikel wandern. |
 
 ## Datenordner und gemeinsame Nutzung
 
@@ -37,6 +39,10 @@ Vorrang.
 ├── literatur.sqlite      Katalog (Kategorien, Bereiche, Schlagworte, Angaben)
 └── Artikel/              abgelegte Dateien, z. B. 00012_Hygieneplan.pdf
 ```
+
+Datenbanken einer älteren Programmversion werden beim ersten Start
+automatisch ergänzt (z. B. um die Rubriken); vorhandene Artikel bleiben
+unverändert. Alle Arbeitsplätze sollten danach dieselbe Version verwenden.
 
 Der Katalog ist eine SQLite-Datenbank (in Python enthalten, ohne Server).
 Sie wird im netzlaufwerktauglichen Modus betrieben und nur für die Dauer

@@ -13,7 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from literatur import einstellungen
 from literatur.datenbank import (
-    DATENBANK, NEU_TAGE, STANDARD_BEREICHE, STANDARD_KATEGORIEN, LiteraturFehler,
+    DATENBANK, NEU_TAGE, SCHEMA, STANDARD_BEREICHE, STANDARD_KATEGORIEN, STANDARD_RUBRIKEN,
+    LiteraturFehler,
     Literaturdatenbank, dateiname, normiere_schlagworte,
 )
 
@@ -230,6 +231,83 @@ class Listen(Grundlage):
         self.anlegen(bereich_ids=[self.bereich("Formulare")])
         self.assertEqual({k.name: k.anzahl for k in self.db.kategorien()}["Qualitätsmanagement"], 1)
         self.assertEqual({b.name: b.anzahl for b in self.db.bereiche()}["Formulare"], 1)
+
+
+class Rubriken(Grundlage):
+    def rubrik(self, name):
+        return next(r.id for r in self.db.rubriken() if r.name == name)
+
+    def test_qm_hat_vorgegebene_rubriken(self):
+        qm = self.kategorie("Qualitätsmanagement")
+        self.assertEqual([r.name for r in self.db.rubriken(qm)],
+                         list(STANDARD_RUBRIKEN["Qualitätsmanagement"]))
+        self.assertEqual(self.db.rubriken(self.kategorie("Medizin")), [])
+
+    def test_artikel_mit_rubrik_ablegen_filtern_aendern(self):
+        a = self.anlegen(rubrik_id=self.rubrik("Arbeitsanweisungen"))
+        b = self.anlegen("Autoklav", rubrik_id=self.rubrik("Gebrauchsanleitungen"))
+        self.assertEqual(a.rubrik, "Arbeitsanweisungen")
+        self.assertEqual([x.titel for x in self.db.suche(
+            rubrik_id=self.rubrik("Gebrauchsanleitungen"))], ["Autoklav"])
+        self.assertEqual([x.titel for x in self.db.suche("einweisungen")], [])
+        c = self.db.artikel_aendern(b.id, "Autoklav", b.kategorie_id,
+                                    rubrik_id=self.rubrik("Einweisungen"))
+        self.assertEqual(c.rubrik, "Einweisungen")
+        self.assertEqual(self.db.artikel_aendern(b.id, "Autoklav", b.kategorie_id).rubrik, "")
+
+    def test_rubrik_muss_zur_kategorie_passen(self):
+        with self.assertRaises(LiteraturFehler):
+            self.anlegen(kategorie="Medizin", rubrik_id=self.rubrik("Arbeitsanweisungen"))
+
+    def test_rubriken_je_kategorie_veraenderbar(self):
+        medizin = self.kategorie("Medizin")
+        neu = self.db.eintrag_hinzufuegen("rubriken", "Leitlinien", medizin)
+        # Gleicher Name in anderer Kategorie ist erlaubt, in derselben nicht.
+        self.db.eintrag_hinzufuegen("rubriken", "Leitlinien", self.kategorie("Sonstiges"))
+        with self.assertRaises(LiteraturFehler):
+            self.db.eintrag_hinzufuegen("rubriken", "leitlinien", medizin)
+        with self.assertRaises(LiteraturFehler):
+            self.db.eintrag_hinzufuegen("rubriken", "Ohne Kategorie")
+        self.db.eintrag_hinzufuegen("rubriken", "Studien", medizin)
+        self.db.eintrag_verschieben("rubriken", neu, 1)
+        self.assertEqual([r.name for r in self.db.rubriken(medizin)], ["Studien", "Leitlinien"])
+        self.db.eintrag_umbenennen("rubriken", self.rubrik("Prozessbeschreibungen"), "Prozesse")
+        self.assertIn("Prozesse", [r.name for r in self.db.rubriken()])
+
+    def test_rubrik_loeschen_behaelt_artikel(self):
+        a = self.anlegen(rubrik_id=self.rubrik("Einweisungen"))
+        self.db.rubrik_loeschen(self.rubrik("Einweisungen"))
+        b = self.db.artikel(a.id)
+        self.assertEqual((b.kategorie, b.rubrik, b.rubrik_id), ("Qualitätsmanagement", "", None))
+
+    def test_kategoriewechsel_beim_loeschen_entfernt_rubrik(self):
+        a = self.anlegen(rubrik_id=self.rubrik("Einweisungen"))
+        self.db.kategorie_loeschen(self.kategorie("Qualitätsmanagement"),
+                                   self.kategorie("Sonstiges"))
+        b = self.db.artikel(a.id)
+        self.assertEqual((b.kategorie, b.rubrik_id), ("Sonstiges", None))
+        self.assertEqual(self.db.rubriken(), [])
+
+
+class Umstellung(unittest.TestCase):
+    def test_datenbank_der_ersten_version_wird_ergaenzt(self):
+        with tempfile.TemporaryDirectory() as temp:
+            ordner = Path(temp)
+            alt = SCHEMA.split("CREATE TABLE IF NOT EXISTS rubriken")[0] + \
+                "CREATE TABLE IF NOT EXISTS artikel" + \
+                SCHEMA.split("CREATE TABLE IF NOT EXISTS artikel", 1)[1]
+            alt = alt.replace("    rubrik_id     INTEGER REFERENCES rubriken(id)"
+                              " ON DELETE SET NULL,\n", "")
+            with sqlite3.connect(ordner / DATENBANK) as roh:
+                roh.executescript(alt)
+                roh.execute("INSERT INTO kategorien (name) VALUES ('Qualitätsmanagement')")
+                roh.execute("INSERT INTO artikel (titel, kategorie_id, angelegt, geaendert)"
+                            " VALUES ('Alt', 1, '2025-01-01', '2025-01-01')")
+                roh.execute("PRAGMA user_version = 1")
+            db = Literaturdatenbank(ordner).einrichten()
+            self.assertEqual(len(db.rubriken()), 5)
+            self.assertEqual(db.suche()[0].rubrik_id, None)
+            self.assertEqual(db.bereiche(), [], "vorhandene Listen bleiben unberuehrt")
 
 
 class Hilfsfunktionen(unittest.TestCase):
