@@ -23,6 +23,10 @@ Es gibt zwei Anwendungen mit derselben Rechengrundlage:
 
 Beide rechnen nachweislich gleich – siehe [Gleichlauf mit der App](#gleichlauf-mit-der-app).
 
+Ebenfalls enthalten ist die **[Literaturdatenbank](literatur/README.md)**
+(`python3 literatur.py`): gemeinsame, offline nutzbare Ablage für Artikel und
+Dokumente der Praxis mit Kategorien, Bereichen und Schlagworten.
+
 ## Start
 
 ```bash
