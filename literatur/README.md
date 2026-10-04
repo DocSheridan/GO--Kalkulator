@@ -21,7 +21,7 @@ python3 literatur.py --ordner L:\Literatur
 | **Bereiche** (frei) | Beliebig viele je Artikel. Vorgabe: Qualitätsmanagement, Formulare, Infektiologie, Metabolik. |
 | **Schlagworte** | Freies Feld, durch Komma getrennt; vorhandene Schlagworte lassen sich aus einer Liste einfügen. |
 | **Weitere Angaben** | Autoren, Jahr, Quelle, Notiz |
-| **Nachträglich bearbeiten** | Alle Angaben – auch Kategorie, Bereiche und Schlagworte – rechts ändern und speichern (Strg+S). Datei durch neue Fassung ersetzen. |
+| **Nachträglich bearbeiten** | Alle Angaben – auch Titel, Kategorie, Rubrik, Bereiche und Schlagworte – rechts ändern und speichern (Strg+S). Datei durch neue Fassung ersetzen. |
 | **Anzeigen** | Reiter **Alle**, **Neues** (in den letzten 31 Tagen abgelegt) oder eine Kategorie; hat sie Rubriken, erscheint darunter eine zweite Leiste zum Filtern nach Rubrik. Dazu Filter nach Bereich und Volltextsuche. Spalten per Klick sortierbar, Doppelklick öffnet die Datei. |
 | **Listen pflegen** | Menü *Listen*: Kategorien, Rubriken und Bereiche ergänzen, umbenennen, sortieren, entfernen. Wird eine benutzte Kategorie entfernt, fragt das Programm, wohin ihre Artikel wandern. |
 
