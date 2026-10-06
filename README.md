@@ -23,6 +23,10 @@ Es gibt zwei Anwendungen mit derselben Rechengrundlage:
 
 Beide rechnen nachweislich gleich – siehe [Gleichlauf mit der App](#gleichlauf-mit-der-app).
 
+Ebenfalls enthalten ist die **[Literaturdatenbank](Literaturdatenbank/README.md)**
+im eigenen Ordner `Literaturdatenbank/`: gemeinsame, offline nutzbare Ablage für Artikel und
+Dokumente der Praxis mit Kategorien, Bereichen und Schlagworten.
+
 ## Start
 
 ```bash
