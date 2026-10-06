@@ -6,6 +6,7 @@ Server kopiert und katalogisiert. Läuft **vollständig offline** und braucht nu
 **Python 3.10+ mit tkinter** – keine weiteren Pakete, keine Internetverbindung.
 
 ```bash
+cd Literaturdatenbank
 python3 literatur.py                    # Start; beim ersten Mal wird der Datenordner erfragt
 python3 literatur.py --ordner L:\Literatur
 ```
@@ -53,11 +54,28 @@ zweite kurz. **F5** holt die Änderungen der anderen Arbeitsplätze.
 
 ## Installation (danach ohne Internet)
 
+Alles Nötige steht in diesem Ordner `Literaturdatenbank/` – er läuft für sich
+allein, ohne den übrigen Inhalt des Repositorys:
+
+```
+Literaturdatenbank/
+├── Literaturdatenbank.pyw   Start per Doppelklick (Windows, ohne Konsolenfenster)
+├── literatur.py             Start aus der Kommandozeile
+├── literatur/               Programm
+├── tests/                   Testfälle
+└── README.md                diese Anleitung
+```
+
+**Herunterladen:** GitHub bietet einzelne Ordner nicht zum Download an. Daher
+auf der Startseite des Repositorys (passenden Branch wählen) „Code › Download
+ZIP“ wählen, entpacken und nur den Ordner `Literaturdatenbank` weiterverwenden.
+
 **Windows:** Python-Installationsprogramm von python.org einmalig
 herunterladen (enthält tkinter) und auf jedem Arbeitsplatz installieren; das
-Installationsprogramm lässt sich per USB-Stick weitergeben. Danach diesen
-Ordner (Repository) z. B. nach `C:\Programme\Literaturdatenbank` kopieren und
-eine Verknüpfung auf `pythonw.exe literatur.py` anlegen (ohne Konsolenfenster).
+Installationsprogramm lässt sich per USB-Stick weitergeben. Danach den Ordner
+`Literaturdatenbank` z. B. nach `C:\Programme\Literaturdatenbank` kopieren und
+`Literaturdatenbank.pyw` per Doppelklick starten – am besten eine Verknüpfung
+darauf auf den Desktop legen.
 
 **Alternativ als einzelne .exe** – einmalig auf einem Rechner mit Internet
 bauen, dann an alle Arbeitsplätze verteilen:
@@ -73,5 +91,6 @@ pyinstaller --onefile --windowed --name Literaturdatenbank literatur.py
 ## Tests
 
 ```bash
-python3 -m unittest tests.test_literatur
+cd Literaturdatenbank
+python3 -m unittest discover -s tests
 ```

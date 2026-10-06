@@ -10,9 +10,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from goae_kalkulator import farben
-
-from . import __version__, einstellungen
+from . import __version__, einstellungen, farben
 from .datenbank import (
     DATENBANK, NEU_TAGE, Artikel, Eintrag, LiteraturFehler, Literaturdatenbank,
     normiere_schlagworte, sortierschluessel,

@@ -310,6 +310,19 @@ class Umstellung(unittest.TestCase):
             self.assertEqual(db.bereiche(), [], "vorhandene Listen bleiben unberuehrt")
 
 
+class Farben(unittest.TestCase):
+    def test_gleiche_palette_wie_der_kalkulator(self):
+        kalkulator = Path(__file__).resolve().parents[2] / "goae_kalkulator" / "farben.py"
+        if not kalkulator.exists():
+            self.skipTest("Literaturdatenbank liegt ohne den Kalkulator vor")
+        werte = {}
+        exec(kalkulator.read_text(encoding="utf-8"), werte)
+        from literatur import farben
+        for name in ("GRUEN", "HELLGRUEN", "GRAU", "WEISS", "GRUEN_STARK", "GRUEN_TON",
+                     "FEHLER"):
+            self.assertEqual(getattr(farben, name), werte[name], name)
+
+
 class Hilfsfunktionen(unittest.TestCase):
     def test_schlagworte(self):
         self.assertEqual(normiere_schlagworte(" a ;b\n A,, c  d "), "a, b, c d")
